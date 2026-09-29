@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../theme/app_theme.dart';
 
 class KundliChartPainter extends CustomPainter {
   final Map<int, List<String>> housePlanets; 

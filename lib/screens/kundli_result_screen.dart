@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../theme/app_theme.dart';
 import '../widgets/kundli_chart.dart';
 import '../core/ephemeris.dart';
 import '../providers/settings_provider.dart';

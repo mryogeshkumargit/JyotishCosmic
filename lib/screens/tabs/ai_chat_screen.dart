@@ -4,7 +4,6 @@ import '../../core/ephemeris.dart';
 import '../../providers/settings_provider.dart';
 import '../../providers/profile_provider.dart';
 import '../../services/ai_service.dart';
-import '../../theme/app_theme.dart';
 
 class AiChatScreen extends ConsumerStatefulWidget {
   final ChartData chartData;

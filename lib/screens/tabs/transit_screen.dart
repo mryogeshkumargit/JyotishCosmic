@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/ephemeris.dart';
 import '../../core/transit_math.dart';
-import '../../core/vedic_math.dart';
 import '../../widgets/kundli_chart.dart';
 import '../../services/ai_service.dart';
 import '../../providers/settings_provider.dart';
