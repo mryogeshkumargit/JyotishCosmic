@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  analyze-test-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter version
+        run: flutter --version
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        id: analyze
+        continue-on-error: true
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings 2>&1 | tee analyze.txt
+
+      # Swiss Ephemeris native library for host-side unit tests (the APK builds its own via the plugin).
+      - name: Build libsweph for tests
+        run: |
+          SWEPH_DIR=$(python3 -c "import json,urllib.parse;c=json.load(open('.dart_tool/package_config.json'));print(next(urllib.parse.unquote(p['rootUri'][7:]) for p in c['packages'] if p['name']=='sweph'))")
+          echo "sweph package: $SWEPH_DIR"
+          SRC="$SWEPH_DIR/native/sweph/src"
+          gcc -shared -fPIC -O2 -DDART_SHARED_LIB -I"$SRC" -o "$RUNNER_TEMP/libsweph.so" \
+            "$SRC"/swecl.c "$SRC"/swedate.c "$SRC"/swehel.c "$SRC"/swehouse.c "$SRC"/swejpl.c \
+            "$SRC"/swemmoon.c "$SRC"/swemplan.c "$SRC"/sweph.c "$SRC"/swephlib.c -lm
+          echo "SWEPH_DYLIB_PATH=$RUNNER_TEMP/libsweph.so" >> "$GITHUB_ENV"
+        continue-on-error: true
+
+      - name: Unit tests
+        id: tests
+        continue-on-error: true
+        run: flutter test --reporter expanded 2>&1 | tee test.txt
+
+      - name: Build release APK
+        id: build
+        run: flutter build apk --release 2>&1 | tee build.txt
+
+      - name: Upload APK
+        if: steps.build.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: jyotish-cosmic-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 14
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-logs
+          path: |
+            analyze.txt
+            test.txt
+            build.txt
+          retention-days: 14
+
+      - name: Fail if analyze or tests failed
+        if: steps.analyze.outcome == 'failure' || steps.tests.outcome == 'failure'
+        run: |
+          echo "analyze: ${{ steps.analyze.outcome }}  tests: ${{ steps.tests.outcome }}"
+          exit 1
