@@ -5,7 +5,6 @@
 // not available the whole group is skipped.
 import 'dart:convert';
 import 'dart:io';
-import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -28,6 +27,14 @@ class _PackageFileLoader implements AssetLoader {
   }
 }
 
+/// Root directory of a dependency, read from .dart_tool/package_config.json.
+String _packageRoot(String name) {
+  final config = jsonDecode(File('.dart_tool/package_config.json').readAsStringSync()) as Map;
+  final pkg = (config['packages'] as List).cast<Map>().firstWhere((p) => p['name'] == name);
+  final configDir = Directory('.dart_tool').absolute.uri;
+  return configDir.resolve(pkg['rootUri'] as String).toFilePath();
+}
+
 /// Angle difference in degrees (handles the 0/360 wrap).
 double _d(double a, double b) => VedicMath.angularDistance(a, b);
 
@@ -39,8 +46,7 @@ void main() {
 
   setUpAll(() async {
     try {
-      final libUri = await Isolate.resolvePackageUri(Uri.parse('package:sweph/sweph.dart'));
-      final packageRoot = File.fromUri(libUri!).parent.parent.path;
+      final packageRoot = _packageRoot('sweph');
       final tmp = Directory.systemTemp.createTempSync('ephe');
       await AstroEngine.init(assetLoader: _PackageFileLoader(packageRoot), epheFilesPath: tmp.path);
     } catch (e) {
