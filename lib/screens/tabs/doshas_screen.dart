@@ -17,7 +17,7 @@ class DoshasScreen extends StatelessWidget {
     var manglik = DoshasMath.computeManglik(chartData.planetLongitudes, lagnaRashi);
     if (manglik != null) doshas.add(manglik);
     
-    var kaalSarp = DoshasMath.computeKaalSarp(chartData.planetLongitudes);
+    var kaalSarp = DoshasMath.computeKaalSarp(chartData.planetLongitudes, lagnaRashi);
     if (kaalSarp != null) doshas.add(kaalSarp);
     
     var pitru = DoshasMath.computePitruDosha(chartData.planetLongitudes, lagnaRashi);
@@ -29,14 +29,13 @@ class DoshasScreen extends StatelessWidget {
     var chandal = DoshasMath.computeGuruChandalDosha(chartData.planetLongitudes);
     doshas.add(chandal);
 
-    var kemadruma = DoshasMath.computeKemadrumaDosha(chartData.planetLongitudes);
+    var kemadruma = DoshasMath.computeKemadrumaDosha(chartData.planetLongitudes, lagnaRashi);
     doshas.add(kemadruma);
 
     // Compute Sadesati using current transit
     if (chartData.planetLongitudes.containsKey('moon')) {
       int moonRashi = VedicMath.rashiIndex(chartData.planetLongitudes['moon']!);
-      final now = DateTime.now().toUtc();
-      ChartData transitChart = Ephemeris.computeChart(now.year, now.month, now.day, now.hour.toDouble(), now.minute.toDouble(), 0, 0, 0);
+      final ChartData transitChart = Ephemeris.currentChart();
       if (transitChart.planetLongitudes.containsKey('saturn')) {
         int saturnRashi = VedicMath.rashiIndex(transitChart.planetLongitudes['saturn']!);
         var sadesati = DoshasMath.computeSadesati(moonRashi, saturnRashi);
@@ -61,17 +60,17 @@ class DoshasScreen extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
+                      Flexible(child: Text(
                         '${dosha.name} (${dosha.hindi})',
                         style: TextStyle(
-                          color: dosha.present ? Theme.of(context).colorScheme.error : Theme.of(context).colorScheme.primary,
+                          color: dosha.isActive ? Theme.of(context).colorScheme.error : Theme.of(context).colorScheme.primary,
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
-                      ),
+                      )),
                       Chip(
-                        label: Text(dosha.present ? 'Present' : 'Absent'),
-                        backgroundColor: dosha.present ? Theme.of(context).colorScheme.errorContainer : Theme.of(context).colorScheme.primaryContainer,
+                        label: Text(!dosha.present ? 'Absent' : (dosha.cancelled ? 'Cancelled' : 'Present')),
+                        backgroundColor: dosha.isActive ? Theme.of(context).colorScheme.errorContainer : Theme.of(context).colorScheme.primaryContainer,
                       ),
                     ],
                   ),
@@ -81,7 +80,16 @@ class DoshasScreen extends StatelessWidget {
                   ],
                   const SizedBox(height: 12),
                   Text(dosha.description),
-                  if (dosha.present && dosha.remedies.isNotEmpty) ...[
+                  if (dosha.conditions.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    ...dosha.conditions.map((c) => Text('• $c')),
+                  ],
+                  if (dosha.present && dosha.exceptions.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text('Cancellation factors:', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
+                    ...dosha.exceptions.map((c) => Text('• $c')),
+                  ],
+                  if (dosha.isActive && dosha.remedies.isNotEmpty) ...[
                     const SizedBox(height: 12),
                     Text('Remedies:', style: TextStyle(color: Theme.of(context).colorScheme.secondary, fontWeight: FontWeight.bold)),
                     ...dosha.remedies.map((r) => Text('• $r')),

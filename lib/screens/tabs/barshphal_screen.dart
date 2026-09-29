@@ -46,11 +46,11 @@ class _BarshphalScreenState extends State<BarshphalScreen> {
                 padding: const EdgeInsets.all(24),
                 child: Column(
                   children: [
-                    const Text('Solar Return Chart for Age', style: TextStyle(color: Colors.grey)),
+                    const Text('Varshaphal for the year starting at age', style: TextStyle(color: Colors.grey)),
                     const SizedBox(height: 8),
                     Text('${data.age}', style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: Colors.amber)),
                     const SizedBox(height: 16),
-                    const Text('Exact Solar Return Time (UTC)'),
+                    const Text('Sidereal solar return (local time)'),
                     Text(data.solarReturnDate, style: const TextStyle(fontWeight: FontWeight.bold)),
                   ],
                 ),
@@ -60,12 +60,12 @@ class _BarshphalScreenState extends State<BarshphalScreen> {
             _buildDetailCard(
               'Muntha',
               '${data.munthaRashiData.name} (${data.munthaRashiData.hindi})',
-              'Lord: ${data.munthaLord.name}',
+              'Lord: ${data.munthaLord.name} • house ${data.munthaHouse} from Varsha Lagna',
               data.munthaLord.color,
             ),
             const SizedBox(height: 16),
             _buildDetailCard(
-              'Year Lagna (Varsheshwar)',
+              'Varsha Lagna (annual ascendant)',
               '${data.yearLagnaData.name} (${data.yearLagnaData.hindi})',
               'Lord: ${data.yearLagnaLord.name}',
               data.yearLagnaLord.color,

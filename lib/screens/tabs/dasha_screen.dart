@@ -13,17 +13,9 @@ class DashaScreen extends ConsumerWidget {
   const DashaScreen({super.key, required this.chartData, required this.birthDate});
 
   void _showAIInterpretation(BuildContext context, WidgetRef ref, DashaCalculations dashas) {
-    // Determine current dasha based on today's JD
-    double todayJD = Ephemeris.julianDay(DateTime.now().year, DateTime.now().month, DateTime.now().day);
-    
-    DashaPeriod? currentMaha;
-    for (var d in dashas.mahadashas) {
-      if (todayJD >= d.startJD && todayJD < d.endJD) {
-        currentMaha = d;
-        break;
-      }
-    }
-    currentMaha ??= dashas.mahadashas.first;
+    final running = dashas.runningAt(Ephemeris.nowJD());
+    final DashaPeriod currentMaha = running.isNotEmpty ? running.first : dashas.mahadashas.first;
+    final chain = running.map((d) => VedicMath.planets[d.lord]?.name ?? d.lord).join(' / ');
 
     showModalBottomSheet(
       context: context,
@@ -49,7 +41,7 @@ class DashaScreen extends ConsumerWidget {
                 child: FutureBuilder<String>(
                   future: AiService.interpret(
                     ref.read(settingsProvider), 
-                    'Analyze the current Vimshottari Mahadasha of ${VedicMath.planets[currentMaha!.lord]?.name ?? currentMaha.lord} running from ${currentMaha.startDate} to ${currentMaha.endDate}.'
+                    'Current Vimshottari periods (Maha / Antar / Pratyantar): $chain. Analyze the current Vimshottari Mahadasha of ${VedicMath.planets[currentMaha.lord]?.name ?? currentMaha.lord} running from ${currentMaha.startDate} to ${currentMaha.endDate}.'
                   ),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
@@ -77,9 +69,12 @@ class DashaScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     double moonSid = chartData.planetLongitudes['moon'] ?? 0.0;
-    final dashas = DashaCalculations.compute(chartData.jd, moonSid);
+    final dashas = DashaCalculations.compute(chartData.jd, moonSid, utcOffset: chartData.utcOffset);
 
-    double todayJD = Ephemeris.julianDay(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+    final double todayJD = Ephemeris.nowJD();
+    final balanceY = dashas.balanceYears.floor();
+    final balanceM = ((dashas.balanceYears - balanceY) * 12).floor();
+    final firstLord = VedicMath.planets[dashas.mahadashas.first.lord]?.name ?? '';
 
     return Scaffold(
       appBar: AppBar(
@@ -87,8 +82,19 @@ class DashaScreen extends ConsumerWidget {
       ),
       body: ListView.builder(
         padding: const EdgeInsets.all(16),
-        itemCount: dashas.mahadashas.length,
-        itemBuilder: (context, index) {
+        itemCount: dashas.mahadashas.length + 1,
+        itemBuilder: (context, i) {
+          if (i == 0) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Text(
+                'Balance of $firstLord Mahadasha at birth: $balanceY years $balanceM months. '
+                'The first period below starts before birth.',
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+              ),
+            );
+          }
+          final index = i - 1;
           final d = dashas.mahadashas[index];
           final p = VedicMath.planets[d.lord];
           bool isCurrent = todayJD >= d.startJD && todayJD < d.endJD;

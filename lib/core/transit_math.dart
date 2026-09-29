@@ -19,6 +19,7 @@ class TransitResult {
   final String effect;
   final String effectType;
   final double sid;
+  final bool retrograde;
 
   TransitResult({
     required this.planet,
@@ -32,120 +33,125 @@ class TransitResult {
     required this.effect,
     required this.effectType,
     required this.sid,
+    this.retrograde = false,
   });
 }
 
+/// Gochara (transit) results counted from the natal Moon sign.
 class TransitMath {
-  static const Map<String, Map<int, TransitEffect>> transitEffects = {
+  /// Classical favourable houses from the natal Moon for each graha (Phaladeepika / BPHS).
+  static const Map<String, List<int>> favourableHouses = {
+    'sun': [3, 6, 10, 11],
+    'moon': [1, 3, 6, 7, 10, 11],
+    'mars': [3, 6, 11],
+    'mercury': [2, 4, 6, 8, 10, 11],
+    'jupiter': [2, 5, 7, 9, 11],
+    'venus': [1, 2, 3, 4, 5, 8, 9, 11, 12],
+    'saturn': [3, 6, 11],
+    'rahu': [3, 6, 11],
+    'ketu': [3, 6, 11],
+  };
+
+  static const Map<String, Map<int, String>> transitTexts = {
     'saturn': {
-      1: TransitEffect('Challenging — health, mental stress, delays', 'difficult'),
-      2: TransitEffect('Financial pressure, family tensions, speech issues', 'difficult'),
-      3: TransitEffect('Gains, courage, brother relations improve', 'good'),
-      4: TransitEffect('Domestic troubles, mental unrest, property issues', 'difficult'),
-      5: TransitEffect('Obstacles in education, children, investments', 'difficult'),
-      6: TransitEffect('Victory over enemies, health improves, debt clearance', 'good'),
-      7: TransitEffect('Partnership issues, marital stress, travel', 'difficult'),
-      8: TransitEffect('Health concerns, sudden events, obstacles', 'difficult'),
-      9: TransitEffect('Father health, fortune dips, spiritual inclination', 'difficult'),
-      10: TransitEffect('Hard work rewarded, career challenges then success', 'mixed'),
-      11: TransitEffect('Good gains, elder sibling help, ambitions fulfilled', 'good'),
-      12: TransitEffect('Expenses rise, foreign travel, spiritual retreat', 'mixed'),
+      1: 'Janma Shani — health, mental stress and delays; part of Sade Sati',
+      2: 'Financial pressure, family tensions; last phase of Sade Sati',
+      3: 'Gains, courage and success through effort',
+      4: 'Domestic worries, property issues (Kantaka Shani)',
+      5: 'Obstacles in education, children and investments',
+      6: 'Victory over enemies, improving health, debts cleared',
+      7: 'Partnership strain, travel, marital stress',
+      8: 'Ashtama Shani — health concerns, sudden setbacks',
+      9: 'Fortune fluctuates, father\'s health, spiritual turn',
+      10: 'Heavy workload and career pressure; rewards come slowly',
+      11: 'Good gains, ambitions fulfilled, support from elders',
+      12: 'Expenses rise, foreign travel; first phase of Sade Sati',
     },
     'jupiter': {
-      1: TransitEffect('Excellent — wisdom, health, new beginnings, prosperity', 'good'),
-      2: TransitEffect('Wealth gains, family happiness, good food', 'good'),
-      3: TransitEffect('Short travels, courage, sibling cooperation', 'mixed'),
-      4: TransitEffect('Property gains, mother happy, vehicle, domestic peace', 'good'),
-      5: TransitEffect('Intelligence, children, investments, creative success', 'good'),
-      6: TransitEffect('Health issues, enemies rise, debt concerns', 'difficult'),
-      7: TransitEffect('Marriage, partnership, legal matters improve', 'good'),
-      8: TransitEffect('Spiritual growth, research, hidden matters', 'mixed'),
-      9: TransitEffect('Exceptional luck, pilgrimage, higher education, father blessed', 'good'),
-      10: TransitEffect('Career peak, recognition, promotions, authority', 'good'),
-      11: TransitEffect('Financial gains, goals achieved, social recognition', 'good'),
-      12: TransitEffect('Spirituality, foreign travel, moksha, expenses for good cause', 'mixed'),
+      1: 'Restlessness, relocation or changes in position',
+      2: 'Wealth gains, family happiness, good food',
+      3: 'Obstacles in work, change of place',
+      4: 'Domestic worries, strained relations with relatives',
+      5: 'Children, intelligence, creative and investment success',
+      6: 'Health issues and trouble from rivals',
+      7: 'Marriage, partnership and comforts improve',
+      8: 'Delays, fatigue, hidden troubles',
+      9: 'Fortune, pilgrimage, higher learning, blessings of elders',
+      10: 'Career fluctuation, loss of position or reputation strain',
+      11: 'Financial gains, goals achieved, recognition',
+      12: 'Expenses, travel, spiritual inclination',
     },
     'mars': {
-      1: TransitEffect('Energy high, aggressive, accidents possible, health watch', 'mixed'),
-      2: TransitEffect('Financial decisions, family disputes, impulsive spending', 'mixed'),
-      3: TransitEffect('Courage, siblings help, short travels, good for athletes', 'good'),
-      4: TransitEffect('Domestic conflicts, property disputes, mother health', 'difficult'),
-      5: TransitEffect('Children issues, love affairs, speculative risks', 'difficult'),
-      6: TransitEffect('Victory over enemies, health improvement, competitive success', 'good'),
-      7: TransitEffect('Partnership conflicts, travel, marital tensions', 'difficult'),
-      8: TransitEffect('Accidents, surgery possible, inheritance disputes', 'difficult'),
-      9: TransitEffect('Long travel, father issues, religious disputes', 'mixed'),
-      10: TransitEffect('Career drive, leadership, ambitious actions', 'good'),
-      11: TransitEffect('Financial gains, goals met, social circle expands', 'good'),
-      12: TransitEffect('Hidden expenses, foreign travel, spiritual pursuits', 'mixed'),
+      1: 'Anger, accidents possible, watch health',
+      2: 'Disputes in family, impulsive spending',
+      3: 'Courage, success over rivals, gains through effort',
+      4: 'Domestic conflicts, property disputes',
+      5: 'Concerns about children, speculative losses',
+      6: 'Victory over enemies, health improves',
+      7: 'Partnership conflicts, marital tension',
+      8: 'Accidents, surgery or injury risk',
+      9: 'Setbacks in fortune, disputes with elders',
+      10: 'Obstacles at work, heavy exertion',
+      11: 'Financial gains, goals met',
+      12: 'Hidden expenses, loss through haste',
     },
   };
 
-  static List<TransitResult> compute(ChartData birthChart, double utcOffset) {
-    final now = DateTime.now().toUtc();
-    final hour = now.hour + now.minute / 60.0;
-    
-    final nowJD = Ephemeris.julianDay(now.year, now.month, now.day, hour, 0, 0);
-    final nowT = (nowJD - 2451545) / 36525;
-    final ayan = Ephemeris.lahiriAyanamsa(nowJD);
+  static String _genericText(String planet, int house, bool good) {
+    final name = VedicMath.planets[planet]!.name;
+    return good
+        ? '$name transiting the ${_ord(house)} from Moon — generally supportive'
+        : '$name transiting the ${_ord(house)} from Moon — needs care';
+  }
 
-    Map<String, double> transitPositions = {};
-    for (var pName in ['sun', 'moon', 'mars', 'mercury', 'jupiter', 'venus', 'saturn']) {
-      double trop;
-      if (pName == 'sun') {
-        trop = Ephemeris.sunLongitude(nowT);
-      } else if (pName == 'moon') {
-        trop = Ephemeris.moonLongitude(nowT);
-      } else {
-        final ch = Ephemeris.computeChart(now.year, now.month, now.day, hour, 0, 28.6, 77.2, 0); // using utc time
-        trop = ch.planetLongitudes[pName]! + ayan; // Because computeChart returns sidereal, we hack back or just use its sidereal. Wait, computeChart uses JD internally. 
-        // Actually computeChart returns sidereal directly! We don't need `trop` logic!
-      }
+  static String _ord(int n) {
+    if (n % 100 >= 11 && n % 100 <= 13) return '${n}th';
+    switch (n % 10) {
+      case 1:
+        return '${n}st';
+      case 2:
+        return '${n}nd';
+      case 3:
+        return '${n}rd';
     }
+    return '${n}th';
+  }
 
-    // It is simpler to just generate a transit chart for the current time!
-    ChartData transitChart = Ephemeris.computeChart(now.year, now.month, now.day, now.hour.toDouble(), now.minute.toDouble(), 28.6, 77.2, 0); // UTC time for transit doesn't depend on location for planetary longitude.
+  static List<TransitResult> compute(ChartData birthChart, double utcOffset, {ChartData? transitChart}) {
+    final now = transitChart ?? Ephemeris.currentChart(utcOffset: utcOffset);
 
-    int moonRashi = VedicMath.rashiIndex(birthChart.planetLongitudes['moon'] ?? 0);
-    int lagnaRashi = (birthChart.ascendantSidereal / 30).floor();
+    final moonRashi = VedicMath.rashiIndex(birthChart.planetLongitudes['moon'] ?? 0);
+    final lagnaRashi = birthChart.lagnaRashi;
+    final transits = <TransitResult>[];
 
-    List<TransitResult> transits = [];
-
-    transitChart.planetLongitudes.forEach((pName, sidereal) {
+    now.planetLongitudes.forEach((pName, sidereal) {
       if (!VedicMath.planets.containsKey(pName)) return;
 
-      int transRashi = VedicMath.rashiIndex(sidereal);
-      int? natalRashi = birthChart.planetLongitudes.containsKey(pName) 
-          ? VedicMath.rashiIndex(birthChart.planetLongitudes[pName]!) 
+      final transRashi = VedicMath.rashiIndex(sidereal);
+      final natalRashi = birthChart.planetLongitudes.containsKey(pName)
+          ? VedicMath.rashiIndex(birthChart.planetLongitudes[pName]!)
           : null;
 
-      int hFromMoon = VedicMath.houseOf(transRashi, moonRashi);
-      int hFromLagna = VedicMath.houseOf(transRashi, lagnaRashi);
+      final hFromMoon = VedicMath.houseOf(transRashi, moonRashi);
+      final hFromLagna = VedicMath.houseOf(transRashi, lagnaRashi);
 
       String? aspectOnNatal;
       if (natalRashi != null) {
         if (transRashi == natalRashi) {
           aspectOnNatal = 'Conjunct';
         } else {
-          int houseFromTrans = (natalRashi - transRashi + 12) % 12 + 1;
-          bool aspects = false;
-          if (houseFromTrans == 7) {
-            aspects = true; // All planets aspect 7th
-          } else if (pName == 'mars' && (houseFromTrans == 4 || houseFromTrans == 8)) {
-            aspects = true;
-          } else if (pName == 'jupiter' && (houseFromTrans == 5 || houseFromTrans == 9)) {
-            aspects = true;
-          } else if (pName == 'saturn' && (houseFromTrans == 3 || houseFromTrans == 10)) {
-            aspects = true;
-          }
-          if (aspects) {
-            aspectOnNatal = 'Aspects';
-          }
+          final houseFromTrans = (natalRashi - transRashi + 12) % 12 + 1;
+          final aspects = houseFromTrans == 7 ||
+              (pName == 'mars' && (houseFromTrans == 4 || houseFromTrans == 8)) ||
+              (pName == 'jupiter' && (houseFromTrans == 5 || houseFromTrans == 9)) ||
+              (pName == 'saturn' && (houseFromTrans == 3 || houseFromTrans == 10));
+          if (aspects) aspectOnNatal = 'Aspects';
         }
       }
 
-      TransitEffect? effectData = transitEffects[pName]?[hFromMoon];
-      
+      final good = favourableHouses[pName]?.contains(hFromMoon) ?? false;
+      final text = transitTexts[pName]?[hFromMoon] ?? _genericText(pName, hFromMoon, good);
+
       transits.add(TransitResult(
         planet: pName,
         planetData: VedicMath.planets[pName]!,
@@ -155,9 +161,10 @@ class TransitMath {
         houseFromMoon: hFromMoon,
         houseFromLagna: hFromLagna,
         aspectOnNatal: aspectOnNatal,
-        effect: effectData?.effect ?? '${VedicMath.planets[pName]!.name} in ${VedicMath.rashis[transRashi].name}',
-        effectType: effectData?.type ?? 'neutral',
+        effect: text,
+        effectType: good ? 'good' : 'difficult',
         sid: sidereal,
+        retrograde: now.isRetrograde(pName),
       ));
     });
 

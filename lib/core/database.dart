@@ -4,7 +4,6 @@ import 'package:drift/native.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqlite3/sqlite3.dart';
-import 'package:sqlite3_flutter_libs/sqlite3_flutter_libs.dart';
 
 part 'database.g.dart';
 
@@ -27,6 +26,9 @@ class Profiles extends Table {
 @DriftDatabase(tables: [Profiles])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
+
+  /// For tests: e.g. `AppDatabase.forTesting(NativeDatabase.memory())`.
+  AppDatabase.forTesting(super.executor);
 
   @override
   int get schemaVersion => 3;

@@ -146,6 +146,12 @@ class VedicMath {
     return x < 0 ? x + 360 : x;
   }
 
+  /// Smallest angle between two longitudes (0..180).
+  static double angularDistance(double a, double b) {
+    final d = norm360(a - b);
+    return d > 180 ? 360 - d : d;
+  }
+
   static int rashiIndex(double sid) => (norm360(sid) / 30).floor();
   static int nakshatraIndex(double sid) => (norm360(sid) / (360 / 27)).floor();
   static int pada(double sid) => ((norm360(sid) % (360 / 27)) / (360 / 108)).floor() + 1;
@@ -182,18 +188,19 @@ class VedicMath {
     if (key == 'D24') return ((ri % 2 == 0 ? 4 : 3) + part) % 12;
     if (key == 'D27') return ((ri % 4) * 3 + part) % 12;
     if (key == 'D30') {
+      // Parashari Trimsamsa: unequal parts ruled by Mars, Saturn, Jupiter, Mercury, Venus.
       if (ri % 2 == 0) {
-        if (pos <= 5) return 0;
-        if (pos <= 10) return 10;
-        if (pos <= 18) return 8;
-        if (pos <= 25) return 2;
-        return 6;
+        if (pos < 5) return 0; // Aries (Mars)
+        if (pos < 10) return 10; // Aquarius (Saturn)
+        if (pos < 18) return 8; // Sagittarius (Jupiter)
+        if (pos < 25) return 2; // Gemini (Mercury)
+        return 6; // Libra (Venus)
       } else {
-        if (pos <= 5) return 1;
-        if (pos <= 12) return 5;
-        if (pos <= 20) return 11;
-        if (pos <= 25) return 9;
-        return 7;
+        if (pos < 5) return 1; // Taurus (Venus)
+        if (pos < 12) return 5; // Virgo (Mercury)
+        if (pos < 20) return 11; // Pisces (Jupiter)
+        if (pos < 25) return 9; // Capricorn (Saturn)
+        return 7; // Scorpio (Mars)
       }
     }
     if (key == 'D40') return ((ri % 2 == 0 ? 0 : 6) + part) % 12;
@@ -228,111 +235,91 @@ class DashaPeriod {
   final double endJD;
   final String startDate;
   final String endDate;
+  final int level; // 1 = Mahadasha, 2 = Antardasha, 3 = Pratyantardasha, 4 = Sookshma
   final List<DashaPeriod> subPeriods;
 
-  DashaPeriod(this.lord, this.years, this.startJD, this.endJD, this.startDate, this.endDate, {this.subPeriods = const []});
+  DashaPeriod(this.lord, this.years, this.startJD, this.endJD, this.startDate, this.endDate,
+      {this.subPeriods = const [], this.level = 1});
+
+  bool contains(double jd) => jd >= startJD && jd < endJD;
 }
 
+/// Vimshottari dasha (120-year cycle).
+///
+/// The first Mahadasha starts *before* birth: the portion of the birth nakshatra already
+/// traversed by the Moon corresponds to the elapsed part of that lord's period. Every level
+/// is then a plain proportional subdivision (sub = parent * lordYears / 120).
 class DashaCalculations {
+  /// Length of a dasha year in days. 365.25 (Julian year) is the most common convention.
+  static const double yearDays = 365.25;
+
   final List<DashaPeriod> mahadashas;
-  
-  DashaCalculations(this.mahadashas);
+  final double birthJD;
 
-  static DashaCalculations compute(double birthJD, double moonSid) {
-    int ni = VedicMath.nakshatraIndex(moonSid);
-    String startLord = VedicMath.nakshatraLord[ni];
-    double frac = (VedicMath.norm360(moonSid) % (360 / 27)) / (360 / 27);
-    double remainingYears = (1 - frac) * VedicMath.dashaYears[startLord]!;
+  /// Balance of the first Mahadasha remaining at birth, in years.
+  final double balanceYears;
 
-    List<DashaPeriod> dashas = [];
-    int si = VedicMath.dashaOrder.indexOf(startLord);
-    double curMahaJD = birthJD;
-    
-    // Calculate first partial Mahadasha
-    dashas.add(_buildMahadasha(startLord, remainingYears, curMahaJD, isFirst: true, totalYears: VedicMath.dashaYears[startLord]!.toDouble(), fracElapsed: frac));
-    curMahaJD += remainingYears * 365.25;
+  DashaCalculations(this.mahadashas, {this.birthJD = 0, this.balanceYears = 0});
 
-    for (int i = 1; i < 9; i++) {
-      String lord = VedicMath.dashaOrder[(si + i) % 9];
-      double yrs = VedicMath.dashaYears[lord]!.toDouble();
-      dashas.add(_buildMahadasha(lord, yrs, curMahaJD, isFirst: false, totalYears: yrs, fracElapsed: 0.0));
-      curMahaJD += yrs * 365.25;
+  /// [birthJD] is UT; [utcOffset] (hours) is used only to show local calendar dates.
+  static DashaCalculations compute(double birthJD, double moonSid,
+      {int depth = 3, double utcOffset = 0}) {
+    final nakSpan = 360 / 27;
+    final ni = VedicMath.nakshatraIndex(moonSid);
+    final startLord = VedicMath.nakshatraLord[ni];
+    final frac = (VedicMath.norm360(moonSid) % nakSpan) / nakSpan;
+    final lordYears = VedicMath.dashaYears[startLord]!.toDouble();
+    final elapsedYears = frac * lordYears;
+    final balance = lordYears - elapsedYears;
+
+    final si = VedicMath.dashaOrder.indexOf(startLord);
+    double cur = birthJD - elapsedYears * yearDays;
+    final mahas = <DashaPeriod>[];
+    for (int i = 0; i < 9; i++) {
+      final lord = VedicMath.dashaOrder[(si + i) % 9];
+      final yrs = VedicMath.dashaYears[lord]!.toDouble();
+      mahas.add(_build(lord, yrs, cur, 1, depth, utcOffset));
+      cur += yrs * yearDays;
     }
-
-    return DashaCalculations(dashas);
+    return DashaCalculations(mahas, birthJD: birthJD, balanceYears: balance);
   }
 
-  static DashaPeriod _buildMahadasha(String lord, double durationYears, double startJD, {required bool isFirst, required double totalYears, required double fracElapsed}) {
-    List<DashaPeriod> antardashas = [];
-    int startIndex = VedicMath.dashaOrder.indexOf(lord);
-    double curAntarJD = startJD;
+  static DashaPeriod _build(
+      String lord, double years, double startJD, int level, int depth, double utcOffset) {
+    final endJD = startJD + years * yearDays;
+    final subs = <DashaPeriod>[];
+    if (level < depth) {
+      final si = VedicMath.dashaOrder.indexOf(lord);
+      double cur = startJD;
+      for (int i = 0; i < 9; i++) {
+        final sub = VedicMath.dashaOrder[(si + i) % 9];
+        final subYears = years * VedicMath.dashaYears[sub]! / 120.0;
+        subs.add(_build(sub, subYears, cur, level + 1, depth, utcOffset));
+        cur += subYears * yearDays;
+      }
+    }
+    final off = utcOffset / 24.0;
+    return DashaPeriod(lord, years, startJD, endJD, VedicMath.jdToDate(startJD + off),
+        VedicMath.jdToDate(endJD + off),
+        subPeriods: subs, level: level);
+  }
 
-    for (int i = 0; i < 9; i++) {
-      String antarLord = VedicMath.dashaOrder[(startIndex + i) % 9];
-      double antarTotalYrs = (totalYears * VedicMath.dashaYears[antarLord]!) / 120.0;
-      
-      // If it's the first partial mahadasha, some antardashas are already over
-      double antarRemainingYrs = antarTotalYrs;
-      if (isFirst) {
-        double mahaYearsElapsed = totalYears * fracElapsed;
-        // Check if this antardasha is fully in the past
-        double previousAntarSum = 0;
-        for (int j = 0; j <= i; j++) {
-           previousAntarSum += (totalYears * VedicMath.dashaYears[VedicMath.dashaOrder[(startIndex + j) % 9]]!) / 120.0;
-        }
-        double thisAntarStartElapsed = previousAntarSum - antarTotalYrs;
-        
-        if (mahaYearsElapsed >= previousAntarSum) {
-          continue; // completely elapsed
-        } else if (mahaYearsElapsed > thisAntarStartElapsed) {
-          antarRemainingYrs = previousAntarSum - mahaYearsElapsed; // partially elapsed
+  /// The chain of running periods (Maha, Antar, Pratyantar, ...) at [jd].
+  List<DashaPeriod> runningAt(double jd) {
+    final chain = <DashaPeriod>[];
+    List<DashaPeriod> level = mahadashas;
+    while (true) {
+      DashaPeriod? found;
+      for (final p in level) {
+        if (p.contains(jd)) {
+          found = p;
+          break;
         }
       }
-
-      antardashas.add(_buildAntardasha(antarLord, antarRemainingYrs, curAntarJD, antarTotalYrs));
-      curAntarJD += antarRemainingYrs * 365.25;
+      if (found == null) break;
+      chain.add(found);
+      level = found.subPeriods;
     }
-
-    return DashaPeriod(
-      lord, 
-      durationYears, 
-      startJD, 
-      startJD + durationYears * 365.25, 
-      VedicMath.jdToDate(startJD), 
-      VedicMath.jdToDate(startJD + durationYears * 365.25),
-      subPeriods: antardashas
-    );
-  }
-
-  static DashaPeriod _buildAntardasha(String lord, double durationYears, double startJD, double totalYears) {
-    List<DashaPeriod> pratyantardashas = [];
-    int startIndex = VedicMath.dashaOrder.indexOf(lord);
-    double curPratJD = startJD;
-    
-    // We don't partial-slice Pratyantar for simplicity, just divide durationYears proportionally
-    for (int i = 0; i < 9; i++) {
-      String pratLord = VedicMath.dashaOrder[(startIndex + i) % 9];
-      double pratYrs = (durationYears * VedicMath.dashaYears[pratLord]!) / 120.0;
-      
-      pratyantardashas.add(DashaPeriod(
-        pratLord,
-        pratYrs,
-        curPratJD,
-        curPratJD + pratYrs * 365.25,
-        VedicMath.jdToDate(curPratJD),
-        VedicMath.jdToDate(curPratJD + pratYrs * 365.25)
-      ));
-      curPratJD += pratYrs * 365.25;
-    }
-
-    return DashaPeriod(
-      lord,
-      durationYears,
-      startJD,
-      startJD + durationYears * 365.25,
-      VedicMath.jdToDate(startJD),
-      VedicMath.jdToDate(startJD + durationYears * 365.25),
-      subPeriods: pratyantardashas
-    );
+    return chain;
   }
 }

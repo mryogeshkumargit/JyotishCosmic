@@ -16,17 +16,7 @@ class AvasthasMath {
   static List<AvasthaData> compute(ChartData chart) {
     List<AvasthaData> result = [];
 
-    // Temporary basic friend/enemy mapping for Jagradadi (since we don't have full Maitri in vedic_math yet)
-    // Awake = Own/Exalted. Dreaming = Friend/Neutral. Sleeping = Enemy/Debilitated.
-    final Map<String, List<String>> friends = {
-      'sun': ['moon', 'mars', 'jupiter'],
-      'moon': ['sun', 'mercury'],
-      'mars': ['sun', 'moon', 'jupiter'],
-      'mercury': ['sun', 'venus'],
-      'jupiter': ['sun', 'moon', 'mars'],
-      'venus': ['mercury', 'saturn'],
-      'saturn': ['mercury', 'venus'],
-    };
+    // Awake = own/exalted, Dreaming = friend/neutral sign, Sleeping = enemy sign/debilitated.
     final Map<String, List<String>> enemies = {
       'sun': ['venus', 'saturn'],
       'moon': [],

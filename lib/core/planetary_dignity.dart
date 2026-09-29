@@ -102,40 +102,61 @@ class PlanetaryDignity {
     return Relationship.neutral;
   }
 
-  // Moolatrikona Signs
+  // Moolatrikona signs and degree ranges [sign, fromDeg, toDeg).
   static const Map<String, int> moolatrikonaSigns = {
-    'sun': 4, // Leo
-    'moon': 1, // Taurus
-    'mars': 0, // Aries
-    'mercury': 5, // Virgo
-    'jupiter': 8, // Sagittarius
-    'venus': 6, // Libra
-    'saturn': 10, // Aquarius
+    'sun': 4, // Leo 0-20
+    'moon': 1, // Taurus 3-30
+    'mars': 0, // Aries 0-12
+    'mercury': 5, // Virgo 15-20
+    'jupiter': 8, // Sagittarius 0-10
+    'venus': 6, // Libra 0-15
+    'saturn': 10, // Aquarius 0-20
   };
 
-  /// Returns a rich dignity string for the planet based on its sign placement and relations.
-  static String getAdvancedDignity(String planet, int rashiIndex, Map<String, int> allPlanetRashis) {
+  static const Map<String, List<double>> moolatrikonaRange = {
+    'sun': [0, 20],
+    'moon': [3, 30],
+    'mars': [0, 12],
+    'mercury': [15, 20],
+    'jupiter': [0, 10],
+    'venus': [0, 15],
+    'saturn': [0, 20],
+  };
+
+  /// Dignity from sign placement (and degree, when given) plus compound relationship with
+  /// the sign's lord. [allPlanetRashis] are 0-based sign indices of all planets.
+  static String getAdvancedDignity(String planet, int rashiIndex, Map<String, int> allPlanetRashis,
+      {double? degree}) {
     final p = VedicMath.planets[planet];
     if (p == null) return 'Neutral';
 
-    // 1. Exaltation / Debilitation
+    // Signs where exaltation overlaps other dignities are resolved by degree.
+    if (degree != null) {
+      if (planet == 'moon' && rashiIndex == 1) return degree < 3 ? 'Exalted' : 'Moolatrikona';
+      if (planet == 'mercury' && rashiIndex == 5) {
+        if (degree < 15) return 'Exalted';
+        if (degree < 20) return 'Moolatrikona';
+        return 'Own Sign';
+      }
+    }
+
     if (p.exalt == rashiIndex) return 'Exalted';
     if (p.debi == rashiIndex) return 'Debilitated';
 
-    // 2. Moolatrikona
-    if (moolatrikonaSigns[planet] == rashiIndex) return 'Moolatrikona';
+    if (moolatrikonaSigns[planet] == rashiIndex) {
+      final range = moolatrikonaRange[planet]!;
+      if (degree == null || (degree >= range[0] && degree < range[1])) return 'Moolatrikona';
+      return 'Own Sign';
+    }
 
-    // 3. Own Sign
     if (p.ownSigns.contains(rashiIndex)) return 'Own Sign';
 
-    // 4. Determine relationship with the dispositor (lord of the current rashi)
-    String dispositor = VedicMath.rashis[rashiIndex].lord;
-    if (dispositor == planet) return 'Own Sign'; // Fallback just in case
+    final dispositor = VedicMath.rashis[rashiIndex].lord;
+    if (dispositor == planet) return 'Own Sign';
 
     if (allPlanetRashis.containsKey(dispositor)) {
-      int dispositorRashi = allPlanetRashis[dispositor]!;
-      Relationship compoundRel = getCompoundRelationship(planet, rashiIndex, dispositor, dispositorRashi);
-      
+      final dispositorRashi = allPlanetRashis[dispositor]!;
+      final compoundRel = getCompoundRelationship(planet, rashiIndex, dispositor, dispositorRashi);
       switch (compoundRel) {
         case Relationship.greatFriend:
           return 'Great Friend\'s Sign';
@@ -150,8 +171,7 @@ class PlanetaryDignity {
       }
     }
 
-    // If dispositor position is somehow missing (shouldn't happen for the 7 classical planets)
-    Relationship naturalRel = getNaturalRelationship(planet, dispositor);
+    final naturalRel = getNaturalRelationship(planet, dispositor);
     if (naturalRel == Relationship.friend) return 'Friend\'s Sign';
     if (naturalRel == Relationship.enemy) return 'Enemy\'s Sign';
     return 'Neutral Sign';

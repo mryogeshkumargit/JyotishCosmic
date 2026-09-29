@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/ephemeris.dart';
 import '../../core/vedic_math.dart';
+import '../../core/planetary_dignity.dart';
 import '../../theme/app_theme.dart';
 import '../../services/ai_service.dart';
 import '../../providers/settings_provider.dart';
@@ -81,6 +82,9 @@ class GrahaScreen extends ConsumerWidget {
       'dignity': '-',
     });
 
+    final allRashis = {
+      for (final e in chartData.planetLongitudes.entries) e.key: VedicMath.rashiIndex(e.value)
+    };
     chartData.planetLongitudes.forEach((key, longitude) {
       final p = VedicMath.planets[key];
       if (p == null) return;
@@ -88,10 +92,13 @@ class GrahaScreen extends ConsumerWidget {
       int nIdx = VedicMath.nakshatraIndex(longitude);
       double deg = VedicMath.degInRashi(longitude);
       int pada = VedicMath.pada(longitude);
-      String dignity = VedicMath.dignityOf(key, rIdx);
+      String dignity = (key == 'rahu' || key == 'ketu')
+          ? VedicMath.dignityOf(key, rIdx)
+          : PlanetaryDignity.getAdvancedDignity(key, rIdx, allRashis, degree: deg);
+      final retro = chartData.isRetrograde(key) && key != 'rahu' && key != 'ketu';
 
       planetDetails.add({
-        'name': p.name,
+        'name': retro ? '${p.name} ℞' : p.name,
         'hindi': p.hindi,
         'degree': '${deg.floor()}° ${(deg%1*60).floor()}\'',
         'rashi': VedicMath.rashis[rIdx].name,

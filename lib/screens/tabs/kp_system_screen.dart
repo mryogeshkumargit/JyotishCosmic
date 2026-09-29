@@ -16,13 +16,21 @@ class KPSystemScreen extends StatefulWidget {
 class _KPSystemScreenState extends State<KPSystemScreen> {
   late Map<String, KPPlanetData> kpPlanets;
   late List<KPCuspData> kpCusps;
+  late Map<int, List<String>> significators;
 
   @override
   void initState() {
     super.initState();
-    double ayanamsa = Ephemeris.lahiriAyanamsa(widget.chartData.jd);
     kpPlanets = KPMath.computeKPPlanets(widget.chartData);
-    kpCusps = KPMath.computeKPCusps(widget.chartData.jd, widget.lat, widget.lon, ayanamsa);
+    kpCusps = KPMath.computeKPCusps(widget.chartData.jd, widget.lat, widget.lon);
+    significators = KPMath.houseSignificators(kpPlanets, kpCusps);
+  }
+
+  static String _dms(double lon) {
+    final d = lon % 30;
+    final deg = d.floor();
+    final min = ((d - deg) * 60).floor();
+    return '$deg°${min.toString().padLeft(2, '0')}\'';
   }
 
   @override
@@ -41,6 +49,14 @@ class _KPSystemScreenState extends State<KPSystemScreen> {
             const Text('Placidus House Cusps', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             _buildCuspTable(),
+            const SizedBox(height: 24),
+            const Text('House Significators', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            ...List.generate(12, (i) => ListTile(
+                  dense: true,
+                  leading: CircleAvatar(radius: 14, child: Text('${i + 1}', style: const TextStyle(fontSize: 12))),
+                  title: Text((significators[i + 1] ?? []).map((p) => p[0].toUpperCase() + p.substring(1)).join(', ')),
+                )),
             const SizedBox(height: 24),
             const Text('KP Interpretations (Sub-Lords)', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
@@ -75,8 +91,8 @@ class _KPSystemScreenState extends State<KPSystemScreen> {
           var data = kpPlanets[p]!;
           return TableRow(
             children: [
-              Padding(padding: const EdgeInsets.all(8.0), child: Text(p.toUpperCase())),
-              Padding(padding: const EdgeInsets.all(8.0), child: Text(data.rashi)),
+              Padding(padding: const EdgeInsets.all(8.0), child: Text('${p.toUpperCase()}${data.retrograde && p != 'rahu' && p != 'ketu' ? ' (R)' : ''}')),
+              Padding(padding: const EdgeInsets.all(8.0), child: Text('${data.rashi} ${_dms(data.longitude)}')),
               Padding(padding: const EdgeInsets.all(8.0), child: Text(data.nakshatraLord.toUpperCase())),
               Padding(padding: const EdgeInsets.all(8.0), child: Text(data.subLord.toUpperCase())),
             ],
@@ -109,7 +125,7 @@ class _KPSystemScreenState extends State<KPSystemScreen> {
           return TableRow(
             children: [
               Padding(padding: const EdgeInsets.all(8.0), child: Text(c.cuspNumber.toString())),
-              Padding(padding: const EdgeInsets.all(8.0), child: Text(c.rashi)),
+              Padding(padding: const EdgeInsets.all(8.0), child: Text('${c.rashi} ${_dms(c.longitude)}')),
               Padding(padding: const EdgeInsets.all(8.0), child: Text(c.nakshatraLord.toUpperCase())),
               Padding(padding: const EdgeInsets.all(8.0), child: Text(c.subLord.toUpperCase())),
             ],
@@ -151,7 +167,7 @@ class _KPSystemScreenState extends State<KPSystemScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Cusp ${c.cuspNumber}: ${meaning}',
+                  'Cusp ${c.cuspNumber}: $meaning',
                   style: TextStyle(color: Theme.of(context).colorScheme.secondary, fontWeight: FontWeight.bold, fontSize: 16),
                 ),
                 const SizedBox(height: 8),

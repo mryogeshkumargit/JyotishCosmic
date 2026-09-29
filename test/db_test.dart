@@ -5,7 +5,7 @@ import 'package:drift/drift.dart';
 
 void main() {
   test('Save Interpretation Test', () async {
-    final db = AppDatabase();
+    final db = AppDatabase.forTesting(NativeDatabase.memory());
     
     final id = await db.into(db.profiles).insert(ProfilesCompanion.insert(
       name: 'Test',
@@ -25,6 +25,6 @@ void main() {
     profile = await (db.select(db.profiles)..where((t) => t.id.equals(id))).getSingle();
     expect(profile.aiInterpretation, 'Test Interpretation');
     
-    print('SUCCESS! AI Interpretation was saved: \${profile.aiInterpretation}');
+    await db.close();
   });
 }

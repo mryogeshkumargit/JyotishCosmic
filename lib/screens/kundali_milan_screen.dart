@@ -6,7 +6,6 @@ import '../providers/settings_provider.dart';
 import '../services/ai_service.dart';
 import '../core/ephemeris.dart';
 import '../core/milan_math.dart';
-import '../core/vedic_math.dart';
 import '../core/database.dart';
 
 class KundaliMilanScreen extends ConsumerStatefulWidget {
@@ -50,10 +49,7 @@ class _KundaliMilanScreenState extends ConsumerState<KundaliMilanScreen> {
         _girlProfile!.lat, _girlProfile!.lon, _girlProfile!.timezone,
       );
 
-      final boyMoon = boyChart.planetLongitudes['moon']!;
-      final girlMoon = girlChart.planetLongitudes['moon']!;
-      
-      final milanResult = MilanMath.calculateMilan(boyMoon, girlMoon);
+      final milanResult = MilanMath.calculateFromCharts(boyChart, girlChart);
       
       setState(() {
         _milanResult = milanResult;
@@ -69,7 +65,9 @@ class _KundaliMilanScreenState extends ConsumerState<KundaliMilanScreen> {
           "5. Graha Maitri (Friendship): ${milanResult.maitri} / 5\n"
           "6. Gana (Temperament): ${milanResult.gana} / 6\n"
           "7. Bhakoot (Health/Wealth): ${milanResult.bhakoot} / 7\n"
-          "8. Nadi (Genetic/Spiritual): ${milanResult.nadi} / 8\n\n"
+          "8. Nadi (Genetic/Spiritual): ${milanResult.nadi} / 8\n"
+          "Details: ${milanResult.details.entries.map((e) => '${e.key}: ${e.value}').join(', ')}\n"
+          "Doshas: ${milanResult.doshas.isEmpty ? 'none' : milanResult.doshas.map((d) => '${d.name} (${d.cancelled ? 'cancelled' : 'present'}: ${d.detail})').join('; ')}\n\n"
           "As an expert Vedic Astrologer, please interpret these specific scores. "
           "Explain why they did well or poorly in key areas, identify any critical doshas (like Nadi or Bhakoot dosha), "
           "and provide a final recommendation or astrological remedies if necessary.";
@@ -82,7 +80,7 @@ class _KundaliMilanScreenState extends ConsumerState<KundaliMilanScreen> {
       });
     } catch (e) {
       setState(() {
-        _resultText = "Error during analysis: \$e";
+        _resultText = "Error during analysis: $e";
       });
     } finally {
       setState(() {
@@ -156,7 +154,7 @@ class _KundaliMilanScreenState extends ConsumerState<KundaliMilanScreen> {
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(child: Text('Error: \$err')),
+        error: (err, _) => Center(child: Text('Error: $err')),
       ),
     );
   }
@@ -178,7 +176,7 @@ class _KundaliMilanScreenState extends ConsumerState<KundaliMilanScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            '\${r.total} / 36',
+            '${_fmt(r.total)} / 36',
             style: const TextStyle(color: AppTheme.starWhite, fontSize: 36, fontWeight: FontWeight.bold),
           ),
           const Divider(color: AppTheme.primaryMystic, height: 32),
@@ -190,10 +188,35 @@ class _KundaliMilanScreenState extends ConsumerState<KundaliMilanScreen> {
           _buildScoreRow('Gana (Temperament)', r.gana, 6),
           _buildScoreRow('Bhakoot (Health/Wealth)', r.bhakoot, 7),
           _buildScoreRow('Nadi (Genetics)', r.nadi, 8),
+          const SizedBox(height: 12),
+          Text(r.verdict, style: const TextStyle(color: AppTheme.saffronAccent, fontSize: 16, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Text(
+            'Boy: ${r.details['boyRashi']} • ${r.details['boyNakshatra']} • ${r.details['boyGana']} • ${r.details['boyNadi']}\n'
+            'Girl: ${r.details['girlRashi']} • ${r.details['girlNakshatra']} • ${r.details['girlGana']} • ${r.details['girlNadi']}',
+            style: const TextStyle(color: AppTheme.starWhite, fontSize: 12, height: 1.5),
+          ),
+          ...r.doshas.map((d) => Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(d.cancelled ? Icons.check_circle_outline : Icons.warning_amber,
+                        size: 18, color: d.cancelled ? Colors.green : Colors.redAccent),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text('${d.name}${d.cancelled ? ' — cancelled' : ''}: ${d.detail}',
+                          style: const TextStyle(color: AppTheme.starWhite, fontSize: 13)),
+                    ),
+                  ],
+                ),
+              )),
         ],
       ),
     );
   }
+
+  static String _fmt(double v) => v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(1);
 
   Widget _buildScoreRow(String label, double score, double max) {
     Color barColor = score == 0 ? Colors.redAccent : (score == max ? Colors.green : AppTheme.saffronAccent);
@@ -213,7 +236,7 @@ class _KundaliMilanScreenState extends ConsumerState<KundaliMilanScreen> {
               borderRadius: BorderRadius.circular(4),
             ),
           ),
-          SizedBox(width: 40, child: Text('\$score / \$max', textAlign: TextAlign.right, style: const TextStyle(color: AppTheme.starWhite, fontSize: 14))),
+          SizedBox(width: 56, child: Text('${_fmt(score)} / ${_fmt(max)}', textAlign: TextAlign.right, style: const TextStyle(color: AppTheme.starWhite, fontSize: 14))),
         ],
       ),
     );

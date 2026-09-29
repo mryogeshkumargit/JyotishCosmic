@@ -35,13 +35,13 @@ class _RashifalScreenState extends ConsumerState<RashifalScreen> {
         profile.lat, profile.lon, profile.timezone,
       );
 
-      final moonLon = chartData.planetLongitudes['Moon'] ?? 0;
+      final moonLon = chartData.planetLongitudes['moon'] ?? 0;
       final moonSignIndex = (moonLon / 30).floor();
       final signs = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
       final moonSign = signs[moonSignIndex];
 
       final prompt = "Generate a highly accurate Vedic Astrology $timeFrame Horoscope (Rashifal) for a person whose Moon Sign (Chandra Rashi) is $moonSign. "
-          "Also consider their Ascendant is ${chartData.ascendantSidereal} degrees. "
+          "Their Ascendant (Lagna) is ${signs[chartData.lagnaRashi]}. "
           "Provide insights on Career, Wealth, Love, and Health for this $timeFrame period. Format beautifully in Markdown.";
 
       final settings = ref.read(settingsProvider);

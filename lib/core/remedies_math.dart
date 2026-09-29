@@ -101,8 +101,9 @@ class RemediesMath {
       String lord = _signLords[sign]!;
       // A planet can be lord of a benefic and malefic house (e.g. Venus for Gemini Ascendant is lord of 5 and 12).
       // Generally, Moolatrikona sign dictates dominance, but we'll recommend charity if it owns a Trik (6,8,12) unless it's Lagna lord.
-      if (!beneficPlanets.contains(lord) || lord != _signLords[ascendantSign]) {
-         maleficPlanets.add(lord);
+      // A planet that also rules a trikona (1/5/9) is treated as a functional benefic.
+      if (!beneficPlanets.contains(lord)) {
+        maleficPlanets.add(lord);
       }
     }
 
@@ -126,7 +127,7 @@ class RemediesMath {
         String charity = _planetRemedies[planet]!['charity']!;
         remedies.add(RemedyResult(
           title: '${planet[0].toUpperCase()}${planet.substring(1)} Pacification',
-          description: 'Mantra: $mantra\\nCharity: $charity',
+          description: 'Mantra: $mantra\nCharity: $charity',
           type: 'charity',
           planetOrDosha: planet,
         ));
@@ -135,7 +136,7 @@ class RemediesMath {
         String charity = rahuKetuRemedies[planet]!['charity']!;
          remedies.add(RemedyResult(
           title: '${planet[0].toUpperCase()}${planet.substring(1)} Pacification',
-          description: 'Mantra: $mantra\\nCharity: $charity',
+          description: 'Mantra: $mantra\nCharity: $charity',
           type: 'charity',
           planetOrDosha: planet,
         ));
@@ -145,34 +146,38 @@ class RemediesMath {
     // 3. Dosha Remedies
     List<DoshaResult> presentDoshas = [];
     
-    var manglik = DoshasMath.computeManglik(chart.planetLongitudes, ascendantSign);
-    if (manglik != null && manglik.present) presentDoshas.add(manglik);
+    final lagnaRashi = chart.lagnaRashi; // 0-based
+    final longs = chart.planetLongitudes;
 
-    var kaalsarp = DoshasMath.computeKaalSarp(chart.planetLongitudes);
-    if (kaalsarp != null && kaalsarp.present) presentDoshas.add(kaalsarp);
+    final manglik = DoshasMath.computeManglik(longs, lagnaRashi);
+    if (manglik != null && manglik.isActive) presentDoshas.add(manglik);
 
-    if (chart.planetLongitudes.containsKey('moon') && chart.planetLongitudes.containsKey('saturn')) {
-      int moonRashi = (chart.planetLongitudes['moon']! / 30).floor();
-      int saturnRashi = (chart.planetLongitudes['saturn']! / 30).floor();
-      var sadesati = DoshasMath.computeSadesati(moonRashi, saturnRashi);
-      if (sadesati.present) presentDoshas.add(sadesati);
+    final kaalsarp = DoshasMath.computeKaalSarp(longs, lagnaRashi);
+    if (kaalsarp != null && kaalsarp.isActive) presentDoshas.add(kaalsarp);
+
+    // Sade Sati depends on where Saturn is *now*, relative to the natal Moon.
+    if (longs.containsKey('moon')) {
+      final moonRashi = (longs['moon']! / 30).floor();
+      final saturnNow = (Ephemeris.currentChart().planetLongitudes['saturn']! / 30).floor();
+      final sadesati = DoshasMath.computeSadesati(moonRashi, saturnNow);
+      if (sadesati.isActive) presentDoshas.add(sadesati);
     }
 
-    var pitru = DoshasMath.computePitruDosha(chart.planetLongitudes, ascendantSign);
-    if (pitru.present) presentDoshas.add(pitru);
+    final pitru = DoshasMath.computePitruDosha(longs, lagnaRashi);
+    if (pitru.isActive) presentDoshas.add(pitru);
 
-    var grahan = DoshasMath.computeGrahanDosha(chart.planetLongitudes);
-    if (grahan.present) presentDoshas.add(grahan);
+    final grahan = DoshasMath.computeGrahanDosha(longs);
+    if (grahan.isActive) presentDoshas.add(grahan);
 
-    var guruChandal = DoshasMath.computeGuruChandalDosha(chart.planetLongitudes);
-    if (guruChandal.present) presentDoshas.add(guruChandal);
+    final guruChandal = DoshasMath.computeGuruChandalDosha(longs);
+    if (guruChandal.isActive) presentDoshas.add(guruChandal);
 
-    var kemadruma = DoshasMath.computeKemadrumaDosha(chart.planetLongitudes);
-    if (kemadruma.present) presentDoshas.add(kemadruma);
+    final kemadruma = DoshasMath.computeKemadrumaDosha(longs, lagnaRashi);
+    if (kemadruma.isActive) presentDoshas.add(kemadruma);
 
-    for (var dosha in presentDoshas) {
-      String doshaRemedy = dosha.remedies.join('\\n• ');
-      if (doshaRemedy.isNotEmpty) doshaRemedy = '• ' + doshaRemedy;
+    for (final dosha in presentDoshas) {
+      var doshaRemedy = dosha.remedies.join('\n• ');
+      if (doshaRemedy.isNotEmpty) doshaRemedy = '• $doshaRemedy';
 
       remedies.add(RemedyResult(
         title: '${dosha.name} Remedy',
