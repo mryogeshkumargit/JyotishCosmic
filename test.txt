@@ -1,0 +1,79 @@
+00:00 +0: loading /home/runner/work/JyotishCosmic/JyotishCosmic/test/calc_rules_test.dart
+00:00 +0: /home/runner/work/JyotishCosmic/JyotishCosmic/test/calc_rules_test.dart: Nakshatra / pada / sign helpers boundaries
+00:00 +1: /home/runner/work/JyotishCosmic/JyotishCosmic/test/calc_rules_test.dart: Nakshatra / pada / sign helpers angular distance wraps around 0°
+00:00 +2: /home/runner/work/JyotishCosmic/JyotishCosmic/test/calc_rules_test.dart: Divisional charts Navamsa (D9)
+00:00 +3: /home/runner/work/JyotishCosmic/JyotishCosmic/test/calc_rules_test.dart: Divisional charts Hora (D2)
+00:00 +4: /home/runner/work/JyotishCosmic/JyotishCosmic/test/calc_rules_test.dart: Divisional charts Trimsamsa (D30) boundaries are half-open
+00:00 +5: /home/runner/work/JyotishCosmic/JyotishCosmic/test/calc_rules_test.dart: Divisional charts Dasamsa (D10) even signs start from the 9th
+00:00 +6: /home/runner/work/JyotishCosmic/JyotishCosmic/test/calc_rules_test.dart: Vimshottari dasha Moon at 0° Aries: Ketu dasha starts at birth, 120 years total
+00:00 +7: /home/runner/work/JyotishCosmic/JyotishCosmic/test/calc_rules_test.dart: Vimshottari dasha Half-way through Bharani: Venus dasha started 10 years before birth
+00:00 +8: /home/runner/work/JyotishCosmic/JyotishCosmic/test/calc_rules_test.dart: Vimshottari dasha Sub-periods tile their parent exactly
+00:00 +9: /home/runner/work/JyotishCosmic/JyotishCosmic/test/calc_rules_test.dart: Vimshottari dasha runningAt returns Maha → Antar → Pratyantar chain
+00:00 +10: /home/runner/work/JyotishCosmic/JyotishCosmic/test/calc_rules_test.dart: Ashtakoot Milan tables Yoni table is symmetric and enemies score 0
+00:00 +11: /home/runner/work/JyotishCosmic/JyotishCosmic/test/calc_rules_test.dart: Ashtakoot Milan tables Nadi follows the Adi-Madhya-Antya zig-zag
+00:00 +12: /home/runner/work/JyotishCosmic/JyotishCosmic/test/calc_rules_test.dart: Ashtakoot Milan tables Gana: Krittika is Rakshasa, Uttara Bhadrapada is Manushya
+00:00 +13: /home/runner/work/JyotishCosmic/JyotishCosmic/test/calc_rules_test.dart: Ashtakoot Milan tables Vashya splits Sagittarius and Capricorn at 15°
+00:00 +14: /home/runner/work/JyotishCosmic/JyotishCosmic/test/calc_rules_test.dart: Ashtakoot Milan tables Graha Maitri points
+00:00 +15: /home/runner/work/JyotishCosmic/JyotishCosmic/test/calc_rules_test.dart: Ashtakoot Milan tables Worked example: Ashwini (Aries 5°) boy with Bharani (Aries 20°) girl = 34
+00:00 +16: /home/runner/work/JyotishCosmic/JyotishCosmic/test/calc_rules_test.dart: Ashtakoot Milan tables Same nakshatra and pada gives an uncancelled Nadi dosha
+00:00 +17: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: (setUpAll)
+00:00 +18: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: (setUpAll)
+00:00 +19: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: (setUpAll)
+00:00 +20: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: (setUpAll)
+00:00 +21: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: (setUpAll)
+00:00 +22: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: (setUpAll)
+00:00 +23: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: (setUpAll)
+00:00 +24: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: (setUpAll)
+00:00 +25: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: (setUpAll)
+00:00 +26: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: (setUpAll)
+00:00 +27: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: (setUpAll)
+00:00 +28: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: (setUpAll)
+00:00 +29: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: (setUpAll)
+00:00 +30: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: (setUpAll)
+00:00 +31: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: (setUpAll)
+00:00 +32: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: (setUpAll)
+00:00 +32: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: Delhi 1990 Julian Day and ayanamsa
+00:00 +33: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: Delhi 1990 Planet longitudes (Lahiri) within 0.001° and retrograde state
+00:00 +34: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: Delhi 1990 Ascendant within 0.001°
+00:00 +35: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: Delhi 1990 Whole-sign houses match planet signs
+00:00 +36: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: Delhi 1990 KP Placidus cusps (Krishnamurti ayanamsa) within 0.001°
+00:00 +37: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: Delhi 1990 Sunrise and sunset within 1 minute
+00:00 +38: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: Delhi 1990 Panchang: limbs consistent with positions and end times
+00:00 +39: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: Delhi 1990 Solar return lands on the natal Sun
+00:00 +40: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: Mumbai 1985 Julian Day and ayanamsa
+00:00 +41: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: Mumbai 1985 Planet longitudes (Lahiri) within 0.001° and retrograde state
+00:00 +42: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: Mumbai 1985 Ascendant within 0.001°
+00:00 +43: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: Mumbai 1985 Whole-sign houses match planet signs
+00:00 +44: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: Mumbai 1985 KP Placidus cusps (Krishnamurti ayanamsa) within 0.001°
+00:00 +45: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: Mumbai 1985 Sunrise and sunset within 1 minute
+00:00 +46: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: Mumbai 1985 Panchang: limbs consistent with positions and end times
+00:00 +47: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: Mumbai 1985 Solar return lands on the natal Sun
+00:00 +48: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: London 2000 Julian Day and ayanamsa
+00:00 +49: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: London 2000 Planet longitudes (Lahiri) within 0.001° and retrograde state
+00:00 +50: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: London 2000 Ascendant within 0.001°
+00:00 +51: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: London 2000 Whole-sign houses match planet signs
+00:00 +52: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: London 2000 KP Placidus cusps (Krishnamurti ayanamsa) within 0.001°
+00:00 +53: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: London 2000 Sunrise and sunset within 1 minute
+00:00 +54: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: London 2000 Panchang: limbs consistent with positions and end times
+00:00 +55: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: London 2000 Solar return lands on the natal Sun
+00:00 +56: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: New York 1975 Julian Day and ayanamsa
+00:00 +57: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: New York 1975 Planet longitudes (Lahiri) within 0.001° and retrograde state
+00:00 +58: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: New York 1975 Ascendant within 0.001°
+00:00 +59: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: New York 1975 Whole-sign houses match planet signs
+00:00 +60: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: New York 1975 KP Placidus cusps (Krishnamurti ayanamsa) within 0.001°
+00:00 +61: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: New York 1975 Sunrise and sunset within 1 minute
+00:00 +62: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: New York 1975 Panchang: limbs consistent with positions and end times
+00:00 +63: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: New York 1975 Solar return lands on the natal Sun
+00:00 +64: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: Sydney 2010 Julian Day and ayanamsa
+00:00 +65: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: Sydney 2010 Planet longitudes (Lahiri) within 0.001° and retrograde state
+00:00 +66: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: Sydney 2010 Ascendant within 0.001°
+00:00 +67: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: Sydney 2010 Whole-sign houses match planet signs
+00:00 +68: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: Sydney 2010 KP Placidus cusps (Krishnamurti ayanamsa) within 0.001°
+00:00 +69: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: Sydney 2010 Sunrise and sunset within 1 minute
+00:00 +70: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: Sydney 2010 Panchang: limbs consistent with positions and end times
+00:00 +71: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: Sydney 2010 Solar return lands on the natal Sun
+00:00 +72: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: Vara follows the Hindu day (starts at sunrise)
+00:00 +73: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: Dasha starts from the Moon nakshatra lord
+00:00 +74: /home/runner/work/JyotishCosmic/JyotishCosmic/test/engine_test.dart: (tearDownAll)
+00:01 +74: /home/runner/work/JyotishCosmic/JyotishCosmic/test/db_test.dart: Save Interpretation Test
+00:01 +75: All tests passed!
