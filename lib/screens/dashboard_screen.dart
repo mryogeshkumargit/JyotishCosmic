@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../theme/app_theme.dart';
 import '../providers/profile_provider.dart';
 import 'kundali_screen.dart';
 import 'chat_screen.dart';
@@ -22,7 +21,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   void _selectProfileAndNavigate(BuildContext context, Widget Function(int profileId) builder) {
     final profilesAsync = ref.read(profileListProvider);
-    final profiles = profilesAsync.value ?? [];
+    final profiles = profilesAsync.value ?? const [];
 
     if (profiles.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please create a profile first.')));
@@ -47,7 +46,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               const SizedBox(height: 16),
               ...profiles.map((p) => ListTile(
                     leading: CircleAvatar(
-                      backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                      backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
                       child: Text(p.name[0].toUpperCase(), style: TextStyle(color: Theme.of(context).colorScheme.primary)),
                     ),
                     title: Text(p.name, style: Theme.of(context).textTheme.titleMedium),
@@ -55,7 +54,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       Navigator.pop(context);
                       Navigator.push(context, MaterialPageRoute(builder: (_) => builder(p.id)));
                     },
-                  )).toList(),
+                  )),
             ],
           ),
         );
@@ -72,7 +71,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         onTap: (index) => setState(() => _currentIndex = index),
         backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
         selectedItemColor: Theme.of(context).colorScheme.secondary,
-        unselectedItemColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+        unselectedItemColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
         type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
@@ -104,7 +103,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 'Unlock the mysteries of your life through the ancient wisdom of Vedic Astrology.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                   fontSize: 14,
                   fontStyle: FontStyle.italic,
                 ),
@@ -128,7 +127,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         image: DecorationImage(
           image: const AssetImage('assets/app_icon.png'),
           fit: BoxFit.cover,
-          colorFilter: ColorFilter.mode(Colors.black.withOpacity(0.65), BlendMode.darken),
+          colorFilter: ColorFilter.mode(Colors.black.withValues(alpha: 0.65), BlendMode.darken),
         ),
       ),
       child: Column(
@@ -139,13 +138,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             children: [
               CircleAvatar(
                 radius: 24,
-                backgroundColor: Theme.of(context).colorScheme.secondary.withOpacity(0.2),
+                backgroundColor: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.2),
                 backgroundImage: const AssetImage('assets/app_icon.png'),
               ),
-              IconButton(
-                icon: Icon(Icons.notifications_none, color: Theme.of(context).colorScheme.onSurface),
-                onPressed: () {},
-              )
+              Chip(
+                avatar: const Icon(Icons.offline_bolt, size: 16),
+                label: const Text('Offline', style: TextStyle(fontSize: 12)),
+                visualDensity: VisualDensity.compact,
+              ),
             ],
           ),
           const SizedBox(height: 24),
@@ -161,7 +161,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           Text(
             'Welcome to Jyotish Cosmic. Your celestial journey awaits.',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.9),
+              color: Colors.white.withValues(alpha: 0.9),
               fontSize: 16,
             ),
           ),
@@ -176,7 +176,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _buildChip('Home', Icons.home_outlined, () {}),
+          _buildChip('New Kundali', Icons.add_circle_outline, () {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const KundaliScreen(initialTab: 1)));
+          }),
           _buildChip('Interpretation', Icons.menu_book_outlined, () {
             _selectProfileAndNavigate(context, (id) => InterpretationScreen(profileId: id));
           }),
@@ -197,7 +199,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Theme.of(context).colorScheme.secondary.withOpacity(0.3)),
+          border: Border.all(color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.3)),
         ),
         child: Row(
           children: [
@@ -247,10 +249,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         decoration: BoxDecoration(
           color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Theme.of(context).colorScheme.secondary.withOpacity(0.1)),
+          border: Border.all(color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.1)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.2),
+              color: Colors.black.withValues(alpha: 0.2),
               blurRadius: 10,
               offset: const Offset(0, 4),
             )

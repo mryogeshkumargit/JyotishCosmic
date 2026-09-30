@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import '../../core/ephemeris.dart';
 import '../../core/kp_math.dart';
+import '../../core/vedic_math.dart';
 
 class KPSystemScreen extends StatefulWidget {
   final ChartData chartData;
-  final double lat;
-  final double lon;
 
-  const KPSystemScreen({super.key, required this.chartData, required this.lat, required this.lon});
+  const KPSystemScreen({super.key, required this.chartData});
 
   @override
   State<KPSystemScreen> createState() => _KPSystemScreenState();
@@ -16,13 +15,14 @@ class KPSystemScreen extends StatefulWidget {
 class _KPSystemScreenState extends State<KPSystemScreen> {
   late Map<String, KPPlanetData> kpPlanets;
   late List<KPCuspData> kpCusps;
+  late double kpAyanamsa;
 
   @override
   void initState() {
     super.initState();
-    double ayanamsa = Ephemeris.lahiriAyanamsa(widget.chartData.jd);
     kpPlanets = KPMath.computeKPPlanets(widget.chartData);
-    kpCusps = KPMath.computeKPCusps(widget.chartData.jd, widget.lat, widget.lon, ayanamsa);
+    kpCusps = KPMath.computeKPCusps(widget.chartData.jd, widget.chartData.lat, widget.chartData.lon);
+    kpAyanamsa = Ephemeris.ayanamsaValue(widget.chartData.jd, Ayanamsa.krishnamurti);
   }
 
   @override
@@ -34,6 +34,8 @@ class _KPSystemScreenState extends State<KPSystemScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Text('Krishnamurti ayanamsa: ${kpAyanamsa.toStringAsFixed(4)}°', style: const TextStyle(color: Colors.grey)),
+            const SizedBox(height: 12),
             const Text('Planetary Details', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             _buildPlanetTable(),
@@ -53,7 +55,7 @@ class _KPSystemScreenState extends State<KPSystemScreen> {
 
   Widget _buildPlanetTable() {
     return Table(
-      border: TableBorder.all(color: Colors.grey.withOpacity(0.3)),
+      border: TableBorder.all(color: Colors.grey.withValues(alpha: 0.3)),
       columnWidths: const {
         0: FlexColumnWidth(2),
         1: FlexColumnWidth(2),
@@ -70,15 +72,14 @@ class _KPSystemScreenState extends State<KPSystemScreen> {
             Padding(padding: EdgeInsets.all(8.0), child: Text('Sub Lord', style: TextStyle(fontWeight: FontWeight.bold))),
           ],
         ),
-        ...['sun', 'moon', 'mars', 'mercury', 'jupiter', 'venus', 'saturn', 'rahu', 'ketu'].map((p) {
-          if (!kpPlanets.containsKey(p)) return const TableRow(children: [Text(''), Text(''), Text(''), Text('')]);
-          var data = kpPlanets[p]!;
+        ...Ephemeris.planetOrder.where(kpPlanets.containsKey).map((p) {
+                    var data = kpPlanets[p]!;
           return TableRow(
             children: [
-              Padding(padding: const EdgeInsets.all(8.0), child: Text(p.toUpperCase())),
-              Padding(padding: const EdgeInsets.all(8.0), child: Text(data.rashi)),
-              Padding(padding: const EdgeInsets.all(8.0), child: Text(data.nakshatraLord.toUpperCase())),
-              Padding(padding: const EdgeInsets.all(8.0), child: Text(data.subLord.toUpperCase())),
+              Padding(padding: const EdgeInsets.all(8.0), child: Text(VedicMath.planets[p]!.name)),
+              Padding(padding: const EdgeInsets.all(8.0), child: Text('${data.rashi} ${VedicMath.formatDegree(data.longitude)}')),
+              Padding(padding: const EdgeInsets.all(8.0), child: Text(VedicMath.capitalize(data.nakshatraLord))),
+              Padding(padding: const EdgeInsets.all(8.0), child: Text(VedicMath.capitalize(data.subLord))),
             ],
           );
         }),
@@ -88,7 +89,7 @@ class _KPSystemScreenState extends State<KPSystemScreen> {
 
   Widget _buildCuspTable() {
     return Table(
-      border: TableBorder.all(color: Colors.grey.withOpacity(0.3)),
+      border: TableBorder.all(color: Colors.grey.withValues(alpha: 0.3)),
       columnWidths: const {
         0: FlexColumnWidth(1),
         1: FlexColumnWidth(2),
@@ -109,9 +110,9 @@ class _KPSystemScreenState extends State<KPSystemScreen> {
           return TableRow(
             children: [
               Padding(padding: const EdgeInsets.all(8.0), child: Text(c.cuspNumber.toString())),
-              Padding(padding: const EdgeInsets.all(8.0), child: Text(c.rashi)),
-              Padding(padding: const EdgeInsets.all(8.0), child: Text(c.nakshatraLord.toUpperCase())),
-              Padding(padding: const EdgeInsets.all(8.0), child: Text(c.subLord.toUpperCase())),
+              Padding(padding: const EdgeInsets.all(8.0), child: Text('${c.rashi} ${VedicMath.formatDegree(c.longitude)}')),
+              Padding(padding: const EdgeInsets.all(8.0), child: Text(VedicMath.capitalize(c.nakshatraLord))),
+              Padding(padding: const EdgeInsets.all(8.0), child: Text(VedicMath.capitalize(c.subLord))),
             ],
           );
         }),
@@ -151,7 +152,7 @@ class _KPSystemScreenState extends State<KPSystemScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Cusp ${c.cuspNumber}: ${meaning}',
+                  'Cusp ${c.cuspNumber}: $meaning',
                   style: TextStyle(color: Theme.of(context).colorScheme.secondary, fontWeight: FontWeight.bold, fontSize: 16),
                 ),
                 const SizedBox(height: 8),
@@ -159,7 +160,7 @@ class _KPSystemScreenState extends State<KPSystemScreen> {
                   'The sub-lord of the ${c.cuspNumber} cusp is ${c.subLord.toUpperCase()}, placed in the star of ${c.nakshatraLord.toUpperCase()}. '
                   'In KP System, the sub-lord dictates the success or failure of the house matters, while the star lord shows the source or nature of the results. '
                   'Thus, matters of $meaning will be heavily influenced by the dignity and significations of ${c.subLord.toUpperCase()} and ${c.nakshatraLord.toUpperCase()} in this chart.',
-                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8), height: 1.4),
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8), height: 1.4),
                 ),
               ],
             ),

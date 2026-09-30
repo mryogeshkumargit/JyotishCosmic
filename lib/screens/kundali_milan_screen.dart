@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../theme/app_theme.dart';
-import '../providers/profile_provider.dart';
-import '../providers/settings_provider.dart';
-import '../services/ai_service.dart';
+import '../core/database.dart';
+import '../core/doshas_math.dart';
 import '../core/ephemeris.dart';
 import '../core/milan_math.dart';
+import '../core/profile_chart.dart';
 import '../core/vedic_math.dart';
-import '../core/database.dart';
+import '../providers/profile_provider.dart';
+import '../widgets/ai_sheet.dart';
 
 class KundaliMilanScreen extends ConsumerStatefulWidget {
   const KundaliMilanScreen({super.key});
@@ -17,232 +17,223 @@ class KundaliMilanScreen extends ConsumerStatefulWidget {
 }
 
 class _KundaliMilanScreenState extends ConsumerState<KundaliMilanScreen> {
-  Profile? _boyProfile;
-  Profile? _girlProfile;
-  bool _isLoading = false;
-  String? _resultText;
+  int? _boyId;
+  int? _girlId;
   MilanResult? _milanResult;
+  ChartData? _boyChart;
+  ChartData? _girlChart;
+  Profile? _boy;
+  Profile? _girl;
 
-  void _analyzeCompatibility() async {
-    if (_boyProfile == null || _girlProfile == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select both profiles')),
-      );
+  void _analyzeCompatibility(List<Profile> profiles) {
+    Profile? find(int? id) {
+      for (final p in profiles) {
+        if (p.id == id) return p;
+      }
+      return null;
+    }
+
+    final boy = find(_boyId);
+    final girl = find(_girlId);
+    if (boy == null || girl == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select both profiles')));
       return;
     }
 
+    final boyChart = boy.computeChart();
+    final girlChart = girl.computeChart();
     setState(() {
-      _isLoading = true;
-      _resultText = null;
-      _milanResult = null;
+      _boy = boy;
+      _girl = girl;
+      _boyChart = boyChart;
+      _girlChart = girlChart;
+      _milanResult = MilanMath.calculateMilan(boyChart.planetLongitudes['moon']!, girlChart.planetLongitudes['moon']!);
     });
+  }
 
-    try {
-      final boyChart = Ephemeris.computeChart(
-        _boyProfile!.dob.year, _boyProfile!.dob.month, _boyProfile!.dob.day,
-        _boyProfile!.dob.hour.toDouble(), _boyProfile!.dob.minute.toDouble(),
-        _boyProfile!.lat, _boyProfile!.lon, _boyProfile!.timezone,
-      );
+  String _moonLabel(ChartData c) {
+    final m = c.planetLongitudes['moon']!;
+    return '${VedicMath.rashis[VedicMath.rashiIndex(m)].name}, ${VedicMath.nakshatras[VedicMath.nakshatraIndex(m)].name} pada ${VedicMath.pada(m)}';
+  }
 
-      final girlChart = Ephemeris.computeChart(
-        _girlProfile!.dob.year, _girlProfile!.dob.month, _girlProfile!.dob.day,
-        _girlProfile!.dob.hour.toDouble(), _girlProfile!.dob.minute.toDouble(),
-        _girlProfile!.lat, _girlProfile!.lon, _girlProfile!.timezone,
-      );
+  DoshaResult? _manglik(ChartData c) => DoshasMath.computeManglik(c.planetLongitudes, c.lagnaRashi);
 
-      final boyMoon = boyChart.planetLongitudes['moon']!;
-      final girlMoon = girlChart.planetLongitudes['moon']!;
-      
-      final milanResult = MilanMath.calculateMilan(boyMoon, girlMoon);
-      
-      setState(() {
-        _milanResult = milanResult;
-      });
+  static String verdict(double total) {
+    if (total < 18) return 'Not recommended (below 18)';
+    if (total <= 24) return 'Average match';
+    if (total <= 32) return 'Very good match';
+    return 'Excellent match';
+  }
 
-      final prompt = "I have performed an exact Vedic Ashtakoot Guna Milan for ${_boyProfile!.name} and ${_girlProfile!.name}. "
-          "Out of 36 possible points, they scored ${milanResult.total}.\n\n"
-          "Here is the breakdown of their scores:\n"
-          "1. Varna (Work/Ego): ${milanResult.varna} / 1\n"
-          "2. Vashya (Attraction): ${milanResult.vashya} / 2\n"
-          "3. Tara (Destiny): ${milanResult.tara} / 3\n"
-          "4. Yoni (Intimacy): ${milanResult.yoni} / 4\n"
-          "5. Graha Maitri (Friendship): ${milanResult.maitri} / 5\n"
-          "6. Gana (Temperament): ${milanResult.gana} / 6\n"
-          "7. Bhakoot (Health/Wealth): ${milanResult.bhakoot} / 7\n"
-          "8. Nadi (Genetic/Spiritual): ${milanResult.nadi} / 8\n\n"
-          "As an expert Vedic Astrologer, please interpret these specific scores. "
-          "Explain why they did well or poorly in key areas, identify any critical doshas (like Nadi or Bhakoot dosha), "
-          "and provide a final recommendation or astrological remedies if necessary.";
-
-      final settings = ref.read(settingsProvider);
-      final response = await AiService.interpret(settings, prompt);
-
-      setState(() {
-        _resultText = response;
-      });
-    } catch (e) {
-      setState(() {
-        _resultText = "Error during analysis: \$e";
-      });
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
+  void _askAi() {
+    final r = _milanResult!;
+    final bm = _manglik(_boyChart!);
+    final gm = _manglik(_girlChart!);
+    final prompt = 'Ashtakoot Guna Milan for ${_boy!.name} (boy) and ${_girl!.name} (girl), computed with the Swiss Ephemeris.\n'
+        'Boy Moon: ${_moonLabel(_boyChart!)}. Girl Moon: ${_moonLabel(_girlChart!)}.\n'
+        'Total: ${r.total} / 36\n'
+        '1. Varna: ${r.varna} / 1\n2. Vashya: ${r.vashya} / 2\n3. Tara: ${r.tara} / 3\n4. Yoni: ${r.yoni} / 4\n'
+        '5. Graha Maitri: ${r.maitri} / 5\n6. Gana: ${r.gana} / 6\n7. Bhakoot: ${r.bhakoot} / 7\n8. Nadi: ${r.nadi} / 8\n'
+        'Boy Manglik: ${bm?.present == true ? 'Yes (${bm!.severity})' : 'No'}. Girl Manglik: ${gm?.present == true ? 'Yes (${gm!.severity})' : 'No'}.\n\n'
+        'As an expert Vedic astrologer, interpret these scores, explain any Nadi, Bhakoot or Manglik dosha and '
+        'possible cancellations, and give a final recommendation with remedies if needed.';
+    showAiSheet(context, ref, title: 'Compatibility Analysis', prompt: prompt);
   }
 
   @override
   Widget build(BuildContext context) {
     final profilesAsync = ref.watch(profileListProvider);
+    final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Kundali Milan')),
       body: profilesAsync.when(
         data: (profiles) {
-          if (profiles.isEmpty) {
-            return const Center(child: Text('Please create profiles first to use Matchmaking.', style: TextStyle(color: AppTheme.starWhite)));
+          if (profiles.length < 2) {
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Text('Please create at least two profiles to use matchmaking.', textAlign: TextAlign.center),
+              ),
+            );
           }
+          final boys = profiles.where((p) => p.gender != 'Female').toList();
+          final girls = profiles.where((p) => p.gender != 'Male').toList();
 
-          return SingleChildScrollView(
+          return ListView(
             padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildProfileSelector('Select Boy Profile', _boyProfile, profiles, (p) => setState(() => _boyProfile = p)),
+            children: [
+              _buildProfileSelector('Select Boy Profile', _boyId, boys, (id) => setState(() => _boyId = id)),
+              const SizedBox(height: 16),
+              _buildProfileSelector('Select Girl Profile', _girlId, girls, (id) => setState(() => _girlId = id)),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: () => _analyzeCompatibility(profiles),
+                icon: const Icon(Icons.people_alt),
+                label: const Text('Analyze Compatibility'),
+              ),
+              const SizedBox(height: 24),
+              if (_milanResult != null) ...[
+                _buildScoreCard(scheme),
                 const SizedBox(height: 16),
-                _buildProfileSelector('Select Girl Profile', _girlProfile, profiles, (p) => setState(() => _girlProfile = p)),
-                const SizedBox(height: 24),
-                ElevatedButton.icon(
-                  onPressed: _isLoading ? null : _analyzeCompatibility,
-                  icon: const Icon(Icons.people_alt, color: AppTheme.cosmicBlack),
-                  label: const Text('Analyze Compatibility', style: TextStyle(color: AppTheme.cosmicBlack)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.saffronAccent,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
+                _buildManglikCard(scheme),
+                const SizedBox(height: 16),
+                OutlinedButton.icon(
+                  onPressed: _askAi,
+                  icon: const Icon(Icons.auto_awesome),
+                  label: const Text('Ask AI for a detailed interpretation'),
                 ),
-                const SizedBox(height: 24),
-                
-                if (_milanResult != null) ...[
-                  _buildScoreCard(),
-                  const SizedBox(height: 24),
-                ],
-
-                if (_isLoading && _milanResult != null)
-                  const Center(
-                    child: Column(
-                      children: [
-                        CircularProgressIndicator(color: AppTheme.saffronAccent),
-                        SizedBox(height: 16),
-                        Text('AI is interpreting the results...', style: TextStyle(color: AppTheme.saffronAccent)),
-                      ],
-                    ),
-                  )
-                else if (_isLoading)
-                  const Center(child: CircularProgressIndicator(color: AppTheme.saffronAccent))
-                else if (_resultText != null)
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppTheme.secondaryMystic.withOpacity(0.3),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppTheme.saffronAccent.withOpacity(0.5)),
-                    ),
-                    child: Text(_resultText!, style: const TextStyle(color: AppTheme.starWhite, fontSize: 16, height: 1.5)),
-                  ),
               ],
-            ),
+            ],
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(child: Text('Error: \$err')),
+        error: (err, _) => Center(child: Text('Error: $err')),
       ),
     );
   }
 
-  Widget _buildScoreCard() {
+  Widget _buildScoreCard(ColorScheme scheme) {
     final r = _milanResult!;
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppTheme.primaryMystic,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.saffronAccent),
-      ),
-      child: Column(
-        children: [
-          Text(
-            'Ashtakoot Score',
-            style: TextStyle(color: Theme.of(context).colorScheme.secondary, fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '\${r.total} / 36',
-            style: const TextStyle(color: AppTheme.starWhite, fontSize: 36, fontWeight: FontWeight.bold),
-          ),
-          const Divider(color: AppTheme.primaryMystic, height: 32),
-          _buildScoreRow('Varna (Work/Ego)', r.varna, 1),
-          _buildScoreRow('Vashya (Attraction)', r.vashya, 2),
-          _buildScoreRow('Tara (Destiny)', r.tara, 3),
-          _buildScoreRow('Yoni (Intimacy)', r.yoni, 4),
-          _buildScoreRow('Graha Maitri (Friendship)', r.maitri, 5),
-          _buildScoreRow('Gana (Temperament)', r.gana, 6),
-          _buildScoreRow('Bhakoot (Health/Wealth)', r.bhakoot, 7),
-          _buildScoreRow('Nadi (Genetics)', r.nadi, 8),
-        ],
+    String fmt(double v) => v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            Text('Ashtakoot Score', style: TextStyle(color: scheme.secondary, fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text('${fmt(r.total)} / 36', style: TextStyle(color: scheme.onSurface, fontSize: 36, fontWeight: FontWeight.bold)),
+            Text(verdict(r.total), style: TextStyle(color: r.total < 18 ? scheme.error : Colors.green)),
+            const SizedBox(height: 8),
+            Text('Boy Moon: ${_moonLabel(_boyChart!)}\nGirl Moon: ${_moonLabel(_girlChart!)}',
+                textAlign: TextAlign.center, style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12)),
+            const Divider(height: 32),
+            _buildScoreRow('Varna (Work/Ego)', r.varna, 1, fmt),
+            _buildScoreRow('Vashya (Attraction)', r.vashya, 2, fmt),
+            _buildScoreRow('Tara (Destiny)', r.tara, 3, fmt),
+            _buildScoreRow('Yoni (Intimacy)', r.yoni, 4, fmt),
+            _buildScoreRow('Graha Maitri (Friendship)', r.maitri, 5, fmt),
+            _buildScoreRow('Gana (Temperament)', r.gana, 6, fmt),
+            _buildScoreRow('Bhakoot (Health/Wealth)', r.bhakoot, 7, fmt),
+            _buildScoreRow('Nadi (Genetics)', r.nadi, 8, fmt),
+            if (r.hasNadiDosha || r.hasBhakootDosha) ...[
+              const SizedBox(height: 12),
+              Text(
+                [if (r.hasNadiDosha) 'Nadi Dosha present', if (r.hasBhakootDosha) 'Bhakoot Dosha present'].join(' • '),
+                style: TextStyle(color: scheme.error, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildScoreRow(String label, double score, double max) {
-    Color barColor = score == 0 ? Colors.redAccent : (score == max ? Colors.green : AppTheme.saffronAccent);
+  Widget _buildManglikCard(ColorScheme scheme) {
+    String status(DoshaResult? d) {
+      if (d == null) return 'Unknown';
+      if (d.present) return 'Manglik (${d.severity})';
+      if (d.exceptions.isNotEmpty) return 'Cancelled: ${d.exceptions.join(', ')}';
+      return 'Not Manglik';
+    }
+
+    final b = _manglik(_boyChart!);
+    final g = _manglik(_girlChart!);
+    final bothOrNeither = (b?.present ?? false) == (g?.present ?? false);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Manglik Dosha', style: TextStyle(color: scheme.secondary, fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text('${_boy!.name}: ${status(b)}'),
+            Text('${_girl!.name}: ${status(g)}'),
+            const SizedBox(height: 8),
+            Text(
+              bothOrNeither ? 'Manglik status is balanced.' : 'Only one partner is Manglik — consider remedies.',
+              style: TextStyle(color: bothOrNeither ? Colors.green : scheme.error),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildScoreRow(String label, double score, double max, String Function(double) fmt) {
+    final Color barColor = score == 0 ? Colors.redAccent : (score == max ? Colors.green : Colors.orange);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6.0),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Expanded(flex: 2, child: Text(label, style: const TextStyle(color: AppTheme.starWhite, fontSize: 14))),
+          Expanded(flex: 3, child: Text(label, style: const TextStyle(fontSize: 14))),
           Expanded(
             flex: 3,
             child: LinearProgressIndicator(
               value: score / max,
-              backgroundColor: AppTheme.primaryMystic,
               color: barColor,
               minHeight: 8,
               borderRadius: BorderRadius.circular(4),
             ),
           ),
-          SizedBox(width: 40, child: Text('\$score / \$max', textAlign: TextAlign.right, style: const TextStyle(color: AppTheme.starWhite, fontSize: 14))),
+          SizedBox(
+            width: 56,
+            child: Text('${fmt(score)} / ${fmt(max)}', textAlign: TextAlign.right, style: const TextStyle(fontSize: 14)),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildProfileSelector(String hint, Profile? selected, List<Profile> allProfiles, ValueChanged<Profile?> onChanged) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppTheme.primaryMystic,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.saffronAccent.withOpacity(0.3)),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<Profile>(
-          isExpanded: true,
-          hint: Text(hint, style: TextStyle(color: AppTheme.starWhite.withOpacity(0.5))),
-          value: selected,
-          dropdownColor: AppTheme.primaryMystic,
-          icon: const Icon(Icons.arrow_drop_down, color: AppTheme.saffronAccent),
-          items: allProfiles.map((p) {
-            return DropdownMenuItem(
-              value: p,
-              child: Text(p.name, style: const TextStyle(color: AppTheme.starWhite)),
-            );
-          }).toList(),
-          onChanged: onChanged,
-        ),
-      ),
+  Widget _buildProfileSelector(String hint, int? selected, List<Profile> options, ValueChanged<int?> onChanged) {
+    return DropdownButtonFormField<int>(
+      decoration: InputDecoration(labelText: hint),
+      initialValue: options.any((p) => p.id == selected) ? selected : null,
+      isExpanded: true,
+      items: options.map((p) => DropdownMenuItem(value: p.id, child: Text(p.name))).toList(),
+      onChanged: onChanged,
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'vedic_math.dart';
 import 'planetary_aspects.dart';
+import 'doshas_math.dart';
 
 class YogaResult {
   final String category;
@@ -114,20 +115,38 @@ class YogasMath {
     Map<String, int> planetRashis = {};
     longs.forEach((p, sid) => planetRashis[p] = VedicMath.rashiIndex(sid));
 
+    final Set<String> seen = {};
     for (int k in kendras) {
       for (int t in trikonas) {
-        if (k == t) continue; // Same lord doesn't form this specific yoga by itself
+        if (k == t) continue;
         String lk = lord(lagnaRashi, k);
         String lt = lord(lagnaRashi, t);
-        
+
+        if (lk == lt) {
+          // One planet owning both a kendra and a trikona is a Yogakaraka.
+          if (k != 1 && seen.add('yogakaraka:$lk')) {
+            yogas.add(YogaResult(
+              category: 'Raja Yoga',
+              name: 'Yogakaraka ${VedicMath.planets[lk]!.name}',
+              hindi: 'योगकारक',
+              formed: true,
+              strength: 'Strong',
+              description: '${VedicMath.planets[lk]!.name} rules both the ${VedicMath.ordinal(k)} and ${VedicMath.ordinal(t)} houses, becoming a Raja Yoga giver for this Lagna.',
+              planets: [lk],
+            ));
+          }
+          continue;
+        }
+
         if (longs.containsKey(lk) && longs.containsKey(lt)) {
           int rK = planetRashis[lk]!;
           int rT = planetRashis[lt]!;
-          
+
           bool isConjunct = (rK == rT);
           bool hasMutualAspect = PlanetaryAspects.hasMutualAspect(lk, lt, planetRashis, lagnaRashi);
 
-          if (isConjunct || hasMutualAspect) {
+          final pair = ([lk, lt]..sort()).join('-');
+          if ((isConjunct || hasMutualAspect) && seen.add(pair)) {
             String type = isConjunct ? 'conjunct' : 'in mutual aspect';
             yogas.add(YogaResult(
               category: 'Raja Yoga',
@@ -135,14 +154,14 @@ class YogasMath {
               hindi: 'केन्द्र-त्रिकोण राज योग',
               formed: true,
               strength: isConjunct ? 'Very Strong' : 'Strong',
-              description: 'Lords of $k and $t house are $type. Brings success, power, and fame.',
+              description: 'Lords of the ${VedicMath.ordinal(k)} and ${VedicMath.ordinal(t)} houses are $type. Brings success, power, and fame.',
               planets: [lk, lt],
             ));
           }
         }
       }
     }
-    
+
     return yogas;
   }
 
@@ -196,14 +215,14 @@ class YogasMath {
         description: 'Planets in 12th from Moon. Healthy, well-mannered, and enjoys worldly pleasures.',
         planets: planetsIn12th,
       ));
-    } else {
+    } else if (DoshasMath.computeKemadrumaDosha(longs).present) {
       yogas.add(YogaResult(
         category: 'Lunar Yoga',
         name: 'Kemadruma Yoga',
         hindi: 'केमद्रुम योग',
         formed: true,
         strength: 'Negative',
-        description: 'No planets on either side of the Moon. Struggles, poverty, and mental restlessness.',
+        description: 'No planets on either side of the Moon and no cancelling planet with or in a kendra from the Moon. Struggles and mental restlessness.',
         planets: ['moon'],
       ));
     }

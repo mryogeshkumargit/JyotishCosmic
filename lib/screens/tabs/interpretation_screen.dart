@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/database_provider.dart';
+import '../../widgets/ai_sheet.dart';
 
 class InterpretationScreen extends ConsumerWidget {
   final int? profileId;
@@ -81,14 +82,7 @@ class InterpretationScreen extends ConsumerWidget {
                   children: [
                     Padding(
                       padding: const EdgeInsets.all(16.0),
-                      child: SelectableText(
-                        body,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurface,
-                          fontSize: 15,
-                          height: 1.5,
-                        ),
-                      ),
+                      child: AiMarkdown(body),
                     ),
                   ],
                 ),

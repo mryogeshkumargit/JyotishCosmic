@@ -10,14 +10,14 @@ class DoshasScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    int lagnaRashi = (chartData.ascendantSidereal / 30).floor();
+    int lagnaRashi = chartData.lagnaRashi;
     
     List<DoshaResult> doshas = [];
     
     var manglik = DoshasMath.computeManglik(chartData.planetLongitudes, lagnaRashi);
     if (manglik != null) doshas.add(manglik);
     
-    var kaalSarp = DoshasMath.computeKaalSarp(chartData.planetLongitudes);
+    var kaalSarp = DoshasMath.computeKaalSarp(chartData.planetLongitudes, lagnaRashi);
     if (kaalSarp != null) doshas.add(kaalSarp);
     
     var pitru = DoshasMath.computePitruDosha(chartData.planetLongitudes, lagnaRashi);
@@ -35,13 +35,8 @@ class DoshasScreen extends StatelessWidget {
     // Compute Sadesati using current transit
     if (chartData.planetLongitudes.containsKey('moon')) {
       int moonRashi = VedicMath.rashiIndex(chartData.planetLongitudes['moon']!);
-      final now = DateTime.now().toUtc();
-      ChartData transitChart = Ephemeris.computeChart(now.year, now.month, now.day, now.hour.toDouble(), now.minute.toDouble(), 0, 0, 0);
-      if (transitChart.planetLongitudes.containsKey('saturn')) {
-        int saturnRashi = VedicMath.rashiIndex(transitChart.planetLongitudes['saturn']!);
-        var sadesati = DoshasMath.computeSadesati(moonRashi, saturnRashi);
-        doshas.add(sadesati);
-      }
+      int saturnRashi = VedicMath.rashiIndex(Ephemeris.siderealLongitude('saturn', Ephemeris.nowJd()));
+      doshas.add(DoshasMath.computeSadesati(moonRashi, saturnRashi));
     }
 
     return Scaffold(
@@ -78,6 +73,15 @@ class DoshasScreen extends StatelessWidget {
                   if (dosha.present && dosha.severity.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Text('Severity: ${dosha.severity}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  ],
+                  if (dosha.conditions.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    ...dosha.conditions.map((c) => Text('• $c', style: const TextStyle(fontSize: 13))),
+                  ],
+                  if (dosha.exceptions.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text('Cancellations:', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
+                    ...dosha.exceptions.map((c) => Text('• $c', style: const TextStyle(fontSize: 13))),
                   ],
                   const SizedBox(height: 12),
                   Text(dosha.description),

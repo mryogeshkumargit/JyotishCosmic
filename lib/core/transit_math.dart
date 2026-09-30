@@ -19,6 +19,7 @@ class TransitResult {
   final String effect;
   final String effectType;
   final double sid;
+  final bool retrograde;
 
   TransitResult({
     required this.planet,
@@ -32,6 +33,7 @@ class TransitResult {
     required this.effect,
     required this.effectType,
     required this.sid,
+    this.retrograde = false,
   });
 }
 
@@ -81,33 +83,52 @@ class TransitMath {
     },
   };
 
-  static List<TransitResult> compute(ChartData birthChart, double utcOffset) {
-    final now = DateTime.now().toUtc();
-    final hour = now.hour + now.minute / 60.0;
-    
-    final nowJD = Ephemeris.julianDay(now.year, now.month, now.day, hour, 0, 0);
-    final nowT = (nowJD - 2451545) / 36525;
-    final ayan = Ephemeris.lahiriAyanamsa(nowJD);
+  /// Houses from the natal Moon where each graha's transit is classically favourable (Gochara).
+  static const Map<String, List<int>> favourableFromMoon = {
+    'sun': [3, 6, 10, 11],
+    'moon': [1, 3, 6, 7, 10, 11],
+    'mars': [3, 6, 11],
+    'mercury': [2, 4, 6, 8, 10, 11],
+    'jupiter': [2, 5, 7, 9, 11],
+    'venus': [1, 2, 3, 4, 5, 8, 9, 11, 12],
+    'saturn': [3, 6, 11],
+    'rahu': [3, 6, 11],
+    'ketu': [3, 6, 11],
+  };
 
-    Map<String, double> transitPositions = {};
-    for (var pName in ['sun', 'moon', 'mars', 'mercury', 'jupiter', 'venus', 'saturn']) {
-      double trop;
-      if (pName == 'sun') {
-        trop = Ephemeris.sunLongitude(nowT);
-      } else if (pName == 'moon') {
-        trop = Ephemeris.moonLongitude(nowT);
-      } else {
-        final ch = Ephemeris.computeChart(now.year, now.month, now.day, hour, 0, 28.6, 77.2, 0); // using utc time
-        trop = ch.planetLongitudes[pName]! + ayan; // Because computeChart returns sidereal, we hack back or just use its sidereal. Wait, computeChart uses JD internally. 
-        // Actually computeChart returns sidereal directly! We don't need `trop` logic!
-      }
-    }
+  static const Map<String, String> _goodTheme = {
+    'sun': 'recognition, authority and vitality',
+    'moon': 'peace of mind, comfort and support',
+    'mercury': 'communication, trade and learning',
+    'venus': 'comforts, relationships and enjoyment',
+    'rahu': 'unexpected gains and ambition',
+    'ketu': 'spiritual insight and victory over obstacles',
+  };
 
-    // It is simpler to just generate a transit chart for the current time!
-    ChartData transitChart = Ephemeris.computeChart(now.year, now.month, now.day, now.hour.toDouble(), now.minute.toDouble(), 28.6, 77.2, 0); // UTC time for transit doesn't depend on location for planetary longitude.
+  static const Map<String, String> _badTheme = {
+    'sun': 'fatigue, friction with authority and expenses',
+    'moon': 'emotional fluctuation and restlessness',
+    'mercury': 'miscommunication and nervous stress',
+    'venus': 'relationship strain and indulgence',
+    'rahu': 'confusion, anxiety and deception',
+    'ketu': 'detachment, losses and health niggles',
+  };
+
+  static TransitEffect effectFor(String planet, int houseFromMoon) {
+    final specific = transitEffects[planet]?[houseFromMoon];
+    if (specific != null) return specific;
+    final good = favourableFromMoon[planet]?.contains(houseFromMoon) ?? false;
+    return good
+        ? TransitEffect('Favourable — ${_goodTheme[planet] ?? 'positive results'}', 'good')
+        : TransitEffect('Unfavourable — ${_badTheme[planet] ?? 'challenges'}', 'difficult');
+  }
+
+  static List<TransitResult> compute(ChartData birthChart, [double? atJd]) {
+    // Planetary longitudes are geocentric, so the place only matters for the ascendant.
+    final ChartData transitChart = Ephemeris.computeChartForJd(atJd ?? Ephemeris.nowJd(), 0, 0);
 
     int moonRashi = VedicMath.rashiIndex(birthChart.planetLongitudes['moon'] ?? 0);
-    int lagnaRashi = (birthChart.ascendantSidereal / 30).floor();
+    int lagnaRashi = birthChart.lagnaRashi;
 
     List<TransitResult> transits = [];
 
@@ -144,8 +165,8 @@ class TransitMath {
         }
       }
 
-      TransitEffect? effectData = transitEffects[pName]?[hFromMoon];
-      
+      final TransitEffect effectData = effectFor(pName, hFromMoon);
+
       transits.add(TransitResult(
         planet: pName,
         planetData: VedicMath.planets[pName]!,
@@ -155,9 +176,10 @@ class TransitMath {
         houseFromMoon: hFromMoon,
         houseFromLagna: hFromLagna,
         aspectOnNatal: aspectOnNatal,
-        effect: effectData?.effect ?? '${VedicMath.planets[pName]!.name} in ${VedicMath.rashis[transRashi].name}',
-        effectType: effectData?.type ?? 'neutral',
+        effect: effectData.effect,
+        effectType: effectData.type,
         sid: sidereal,
+        retrograde: transitChart.isRetrograde(pName),
       ));
     });
 

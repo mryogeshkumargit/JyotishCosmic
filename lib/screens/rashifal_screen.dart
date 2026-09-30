@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../theme/app_theme.dart';
+import '../core/chart_summary.dart';
+import '../core/database.dart';
+import '../core/profile_chart.dart';
+import '../core/transit_math.dart';
+import '../core/vedic_math.dart';
 import '../providers/profile_provider.dart';
 import '../providers/settings_provider.dart';
 import '../services/ai_service.dart';
-import '../core/ephemeris.dart';
-import '../core/database.dart';
+import '../widgets/ai_sheet.dart';
 
 class RashifalScreen extends ConsumerStatefulWidget {
   const RashifalScreen({super.key});
@@ -17,142 +20,130 @@ class RashifalScreen extends ConsumerStatefulWidget {
 class _RashifalScreenState extends ConsumerState<RashifalScreen> {
   bool _isLoading = false;
   String? _resultText;
-  String _activeTab = 'Daily';
-  Profile? _selectedProfile;
-  bool _initialized = false;
+  String? _error;
+  String? _activeTab;
+  int? _selectedId;
 
-  void _fetchRashifal(String timeFrame, Profile profile) async {
+  Future<void> _fetchRashifal(String timeFrame, Profile profile) async {
     setState(() {
       _isLoading = true;
       _resultText = null;
+      _error = null;
       _activeTab = timeFrame;
     });
 
     try {
-      final chartData = Ephemeris.computeChart(
-        profile.dob.year, profile.dob.month, profile.dob.day,
-        profile.dob.hour.toDouble(), profile.dob.minute.toDouble(),
-        profile.lat, profile.lon, profile.timezone,
-      );
+      final chartData = profile.computeChart();
+      final moonSid = chartData.planetLongitudes['moon']!;
+      final moonSign = VedicMath.rashis[VedicMath.rashiIndex(moonSid)].name;
+      final nakshatra = VedicMath.nakshatras[VedicMath.nakshatraIndex(moonSid)].name;
+      final transits = TransitMath.compute(chartData);
+      final today = DateTime.now();
 
-      final moonLon = chartData.planetLongitudes['Moon'] ?? 0;
-      final moonSignIndex = (moonLon / 30).floor();
-      final signs = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
-      final moonSign = signs[moonSignIndex];
+      final prompt = 'Today is ${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}. '
+          'Generate a Vedic $timeFrame horoscope (Rashifal) for a person whose Moon sign (Chandra Rashi) is $moonSign '
+          '(nakshatra $nakshatra). Use the current planetary transits counted from the Moon sign below. '
+          'Cover career, wealth, love and health for this $timeFrame period.\n\n'
+          'Current transits (sidereal):\n'
+          '${transits.map((t) => '- ${t.planetData.name} in ${t.rashiData.name}${t.retrograde ? ' (retrograde)' : ''}, house ${t.houseFromMoon} from Moon').join('\n')}\n\n'
+          'Natal chart:\n${ChartSummary.describe(chartData, name: profile.name)}';
 
-      final prompt = "Generate a highly accurate Vedic Astrology $timeFrame Horoscope (Rashifal) for a person whose Moon Sign (Chandra Rashi) is $moonSign. "
-          "Also consider their Ascendant is ${chartData.ascendantSidereal} degrees. "
-          "Provide insights on Career, Wealth, Love, and Health for this $timeFrame period. Format beautifully in Markdown.";
-
-      final settings = ref.read(settingsProvider);
-      final response = await AiService.interpret(settings, prompt);
-
-      setState(() {
-        _resultText = response;
-      });
+      final response = await AiService.interpret(ref.read(settingsProvider), prompt);
+      if (mounted) setState(() => _resultText = response);
     } catch (e) {
-      setState(() {
-        _resultText = "Error fetching horoscope: $e";
-      });
+      if (mounted) setState(() => _error = '$e');
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final profilesAsync = ref.watch(profileListProvider);
+    final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Rashifal (Horoscope)')),
       body: profilesAsync.when(
         data: (profiles) {
           if (profiles.isEmpty) {
-            return Center(child: Text('Create a profile to view your Rashifal.', style: TextStyle(color: Theme.of(context).colorScheme.onSurface)));
+            return const Center(child: Text('Create a profile to view your Rashifal.'));
           }
-
-          if (!_initialized) {
-            _selectedProfile = profiles.first;
-            _initialized = true;
+          Profile? selected;
+          for (final p in profiles) {
+            if (p.id == _selectedId) selected = p;
           }
+          final Profile profile = selected ?? profiles.first;
+          final moonSid = profile.computeChart().planetLongitudes['moon']!;
 
           return Column(
             children: [
               const SizedBox(height: 16),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: DropdownButtonFormField<Profile>(
+                child: DropdownButtonFormField<int>(
                   decoration: const InputDecoration(labelText: 'Select Profile'),
-                  value: _selectedProfile,
+                  initialValue: profile.id,
                   isExpanded: true,
-                  items: profiles.map((p) {
-                    return DropdownMenuItem<Profile>(
-                      value: p,
-                      child: Text(p.name, style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
-                    );
-                  }).toList(),
-                  onChanged: (val) {
-                    setState(() {
-                      _selectedProfile = val;
-                      _resultText = null; // Clear previous results on profile change
-                    });
-                  },
+                  items: profiles.map((p) => DropdownMenuItem<int>(value: p.id, child: Text(p.name))).toList(),
+                  onChanged: _isLoading
+                      ? null
+                      : (val) => setState(() {
+                            _selectedId = val;
+                            _resultText = null;
+                            _error = null;
+                            _activeTab = null;
+                          }),
                 ),
               ),
-              const SizedBox(height: 16),
-              Text('Horoscope for ${_selectedProfile?.name ?? ''}', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 12),
+              Text('Moon sign: ${VedicMath.rashis[VedicMath.rashiIndex(moonSid)].name} '
+                  '(${VedicMath.rashis[VedicMath.rashiIndex(moonSid)].hindi})',
+                  style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  _buildTabButton('Daily', _selectedProfile!),
-                  _buildTabButton('Weekly', _selectedProfile!),
-                  _buildTabButton('Monthly', _selectedProfile!),
+                  for (final tab in ['Daily', 'Weekly', 'Monthly'])
+                    ElevatedButton(
+                      onPressed: _isLoading ? null : () => _fetchRashifal(tab, profile),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _activeTab == tab ? scheme.primary : scheme.surfaceContainerHighest,
+                        foregroundColor: _activeTab == tab ? scheme.onPrimary : scheme.onSurface,
+                      ),
+                      child: Text(tab),
+                    ),
                 ],
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
               Expanded(
                 child: _isLoading
-                    ? Center(child: CircularProgressIndicator(color: Theme.of(context).colorScheme.primary))
-                    : _resultText != null
-                        ? SingleChildScrollView(
-                            padding: const EdgeInsets.all(16),
-                            child: Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: Theme.of(context).colorScheme.outline),
-                              ),
-                              child: Text(_resultText!, style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 16, height: 1.5)),
-                            ),
-                          )
-                        : Center(child: Text('Select a timeframe to view your horoscope.', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant))),
-              )
+                    ? Center(child: CircularProgressIndicator(color: scheme.primary))
+                    : _error != null
+                        ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!, style: TextStyle(color: scheme.error))))
+                        : _resultText != null
+                            ? SingleChildScrollView(
+                                padding: const EdgeInsets.all(16),
+                                child: Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: scheme.surfaceContainerHighest,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(color: scheme.outline),
+                                  ),
+                                  child: AiMarkdown(_resultText!),
+                                ),
+                              )
+                            : Center(
+                                child: Text('Select a timeframe to view the horoscope.',
+                                    style: TextStyle(color: scheme.onSurfaceVariant))),
+              ),
             ],
           );
         },
-        loading: () => Center(child: CircularProgressIndicator(color: Theme.of(context).colorScheme.primary)),
+        loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, _) => Center(child: Text('Error: $err')),
       ),
-    );
-  }
-
-  Widget _buildTabButton(String title, Profile profile) {
-    final isActive = _activeTab == title;
-    return ElevatedButton(
-      onPressed: () => _fetchRashifal(title, profile),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: isActive ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.surfaceContainerHighest,
-        foregroundColor: isActive ? Theme.of(context).colorScheme.onPrimary : Theme.of(context).colorScheme.onSurface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: BorderSide(color: Theme.of(context).colorScheme.outline),
-        ),
-      ),
-      child: Text(title),
     );
   }
 }

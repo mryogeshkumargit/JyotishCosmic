@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/ephemeris.dart';
 import '../../core/yogas_math.dart';
+import '../../core/vedic_math.dart';
 
 class YogasScreen extends StatelessWidget {
   final ChartData chartData;
@@ -9,7 +10,7 @@ class YogasScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    int lagnaRashi = (chartData.ascendantSidereal / 30).floor();
+    int lagnaRashi = chartData.lagnaRashi;
     List<YogaResult> yogas = YogasMath.computeAllYogas(chartData.planetLongitudes, lagnaRashi);
 
     if (yogas.isEmpty) {
@@ -38,7 +39,7 @@ class YogasScreen extends StatelessWidget {
                   const SizedBox(height: 8),
                   Text(yoga.description, style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 14)),
                   const SizedBox(height: 8),
-                  Text('Planets Involved: ${yoga.planets.join(', ').toUpperCase()}', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12)),
+                  Text('Planets Involved: ${yoga.planets.map(VedicMath.capitalize).join(', ')}', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12)),
                 ],
               ),
             ),

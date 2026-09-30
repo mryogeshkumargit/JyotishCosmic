@@ -24,7 +24,7 @@ class AppTheme {
       onSurface: const Color(0xFFE5E7EB), // Very legible off-white
       surfaceContainerHighest: const Color(0xFF1A1C23), // Cards
       onSurfaceVariant: const Color(0xFF9CA3AF), // Subtitles
-      outline: const Color(0xFFD4AF37).withOpacity(0.3),
+      outline: const Color(0xFFD4AF37).withValues(alpha: 0.3),
     );
 
     return _buildTheme(colorScheme);
@@ -104,7 +104,7 @@ class AppTheme {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           elevation: 6,
-          shadowColor: colorScheme.primary.withOpacity(0.4),
+          shadowColor: colorScheme.primary.withValues(alpha: 0.4),
           textStyle: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16),
         ),
       ),
@@ -128,7 +128,7 @@ class AppTheme {
       cardTheme: CardThemeData(
         color: colorScheme.surfaceContainerHighest,
         elevation: 8,
-        shadowColor: colorScheme.primary.withOpacity(0.15),
+        shadowColor: colorScheme.primary.withValues(alpha: 0.15),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
           side: BorderSide(
@@ -143,7 +143,7 @@ class AppTheme {
         filled: true,
         fillColor: colorScheme.surfaceContainerHighest,
         labelStyle: GoogleFonts.inter(color: colorScheme.onSurfaceVariant),
-        hintStyle: GoogleFonts.inter(color: colorScheme.onSurfaceVariant.withOpacity(0.5)),
+        hintStyle: GoogleFonts.inter(color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide(color: colorScheme.outline),

@@ -1,128 +1,74 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/chart_summary.dart';
 import '../../core/ephemeris.dart';
 import '../../core/vedic_math.dart';
-import '../../theme/app_theme.dart';
-import '../../services/ai_service.dart';
-import '../../providers/settings_provider.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../widgets/ai_sheet.dart';
 
 class DashaScreen extends ConsumerWidget {
   final ChartData chartData;
-  final DateTime birthDate;
+  final int? profileId;
+  final String? name;
 
-  const DashaScreen({super.key, required this.chartData, required this.birthDate});
-
-  void _showAIInterpretation(BuildContext context, WidgetRef ref, DashaCalculations dashas) {
-    // Determine current dasha based on today's JD
-    double todayJD = Ephemeris.julianDay(DateTime.now().year, DateTime.now().month, DateTime.now().day);
-    
-    DashaPeriod? currentMaha;
-    for (var d in dashas.mahadashas) {
-      if (todayJD >= d.startJD && todayJD < d.endJD) {
-        currentMaha = d;
-        break;
-      }
-    }
-    currentMaha ??= dashas.mahadashas.first;
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (context) {
-        return Container(
-          padding: const EdgeInsets.all(24),
-          height: MediaQuery.of(context).size.height * 0.7,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.auto_awesome, color: Theme.of(context).colorScheme.secondary),
-                  const SizedBox(width: 8),
-                  Text('Vimshottari Dasha Analysis', style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 20, fontWeight: FontWeight.bold)),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Expanded(
-                child: FutureBuilder<String>(
-                  future: AiService.interpret(
-                    ref.read(settingsProvider), 
-                    'Analyze the current Vimshottari Mahadasha of ${VedicMath.planets[currentMaha!.lord]?.name ?? currentMaha.lord} running from ${currentMaha.startDate} to ${currentMaha.endDate}.'
-                  ),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return Center(child: CircularProgressIndicator(color: Theme.of(context).colorScheme.secondary));
-                    }
-                    if (snapshot.hasError) {
-                      return Center(child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.red)));
-                    }
-                    return SingleChildScrollView(
-                      child: Text(
-                        snapshot.data ?? 'No response',
-                        style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 16, height: 1.5),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
+  const DashaScreen({super.key, required this.chartData, this.profileId, this.name});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    double moonSid = chartData.planetLongitudes['moon'] ?? 0.0;
-    final dashas = DashaCalculations.compute(chartData.jd, moonSid);
+    final double moonSid = chartData.planetLongitudes['moon'] ?? 0.0;
+    final dashas = DashaCalculations.compute(chartData.jd, moonSid, utcOffset: chartData.utcOffset);
+    final double todayJD = Ephemeris.nowJd();
+    final running = dashas.runningAt(todayJD);
+    final scheme = Theme.of(context).colorScheme;
 
-    double todayJD = Ephemeris.julianDay(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+    TextStyle periodStyle(bool current, double size) => TextStyle(
+          color: current ? scheme.secondary : scheme.onSurface,
+          fontWeight: current ? FontWeight.bold : FontWeight.normal,
+          fontSize: size,
+        );
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Vimshottari Dasha'),
-      ),
+      appBar: AppBar(title: const Text('Vimshottari Dasha')),
       body: ListView.builder(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
         itemCount: dashas.mahadashas.length,
         itemBuilder: (context, index) {
           final d = dashas.mahadashas[index];
           final p = VedicMath.planets[d.lord];
-          bool isCurrent = todayJD >= d.startJD && todayJD < d.endJD;
+          final bool isCurrent = d.contains(todayJD);
 
           return Card(
             margin: const EdgeInsets.only(bottom: 12),
-            color: isCurrent ? Theme.of(context).colorScheme.secondary.withOpacity(0.1) : Theme.of(context).cardColor,
+            color: isCurrent ? scheme.secondary.withValues(alpha: 0.1) : Theme.of(context).cardColor,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
-              side: BorderSide(
-                color: isCurrent ? Theme.of(context).colorScheme.secondary : Colors.transparent,
-                width: 1.5,
-              ),
+              side: BorderSide(color: isCurrent ? scheme.secondary : Colors.transparent, width: 1.5),
             ),
             child: ExpansionTile(
+              initiallyExpanded: isCurrent,
               leading: CircleAvatar(
-                backgroundColor: p?.color.withOpacity(0.2) ?? Colors.grey,
+                backgroundColor: p?.color.withValues(alpha: 0.2) ?? Colors.grey,
                 child: Text(p?.symbol ?? '', style: TextStyle(color: p?.color ?? Colors.white, fontSize: 18)),
               ),
-              title: Text('${p?.name ?? d.lord} Mahadasha', style: TextStyle(color: isCurrent ? Theme.of(context).colorScheme.secondary : Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.bold)),
-              subtitle: Text('${d.startDate} - ${d.endDate}', style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7), fontSize: 12)),
+              title: Text('${p?.name ?? d.lord} Mahadasha',
+                  style: TextStyle(color: isCurrent ? scheme.secondary : scheme.onSurface, fontWeight: FontWeight.bold)),
+              subtitle: Text(
+                '${d.startDate} - ${d.endDate}${index == 0 ? '  (balance at birth ${d.years.toStringAsFixed(2)} y)' : ''}',
+                style: TextStyle(color: scheme.onSurface.withValues(alpha: 0.7), fontSize: 12),
+              ),
               children: d.subPeriods.map((antar) {
                 final ap = VedicMath.planets[antar.lord];
-                bool isAntarCurrent = todayJD >= antar.startJD && todayJD < antar.endJD;
+                final bool isAntarCurrent = antar.contains(todayJD);
                 return ExpansionTile(
-                  title: Text('${ap?.name ?? antar.lord} Antardasha', style: TextStyle(color: isAntarCurrent ? Theme.of(context).colorScheme.secondary : Theme.of(context).colorScheme.onSurface, fontWeight: isAntarCurrent ? FontWeight.bold : FontWeight.normal, fontSize: 15)),
-                  subtitle: Text('${antar.startDate} - ${antar.endDate}', style: TextStyle(fontSize: 12)),
+                  initiallyExpanded: isAntarCurrent,
+                  title: Text('${ap?.name ?? antar.lord} Antardasha', style: periodStyle(isAntarCurrent, 15)),
+                  subtitle: Text('${antar.startDate} - ${antar.endDate}', style: const TextStyle(fontSize: 12)),
                   children: antar.subPeriods.map((pratyantar) {
                     final pp = VedicMath.planets[pratyantar.lord];
-                    bool isPratCurrent = todayJD >= pratyantar.startJD && todayJD < pratyantar.endJD;
                     return ListTile(
                       contentPadding: const EdgeInsets.only(left: 32, right: 16),
-                      title: Text('${pp?.name ?? pratyantar.lord} Pratyantardasha', style: TextStyle(color: isPratCurrent ? Theme.of(context).colorScheme.secondary : Theme.of(context).colorScheme.onSurface, fontWeight: isPratCurrent ? FontWeight.bold : FontWeight.normal, fontSize: 14)),
-                      subtitle: Text('${pratyantar.startDate} - ${pratyantar.endDate}', style: TextStyle(fontSize: 11)),
+                      title: Text('${pp?.name ?? pratyantar.lord} Pratyantardasha',
+                          style: periodStyle(pratyantar.contains(todayJD), 14)),
+                      subtitle: Text('${pratyantar.startDate} - ${pratyantar.endDate}', style: const TextStyle(fontSize: 11)),
                     );
                   }).toList(),
                 );
@@ -132,11 +78,27 @@ class DashaScreen extends ConsumerWidget {
         },
       ),
       floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: Theme.of(context).colorScheme.secondary,
-        foregroundColor: Theme.of(context).colorScheme.onSecondary,
+        backgroundColor: scheme.secondary,
+        foregroundColor: scheme.onSecondary,
         icon: const Icon(Icons.auto_awesome),
         label: const Text('Ask AI Current Dasha'),
-        onPressed: () => _showAIInterpretation(context, ref, dashas),
+        onPressed: running.isEmpty
+            ? null
+            : () {
+                final chain = running
+                    .map((d) => '${VedicMath.planets[d.lord]!.name} (${d.startDate} to ${d.endDate})')
+                    .join(' > ');
+                showAiSheet(
+                  context,
+                  ref,
+                  title: 'Vimshottari Dasha Analysis',
+                  profileId: profileId,
+                  prompt: 'Analyze the currently running Vimshottari dasha periods for this native: $chain. '
+                      'Explain what the Mahadasha, Antardasha and Pratyantardasha lords signify from their '
+                      'placement, lordship and strength in this chart, and what to expect in this period.\n\n'
+                      '${ChartSummary.describe(chartData, name: name)}',
+                );
+              },
       ),
     );
   }

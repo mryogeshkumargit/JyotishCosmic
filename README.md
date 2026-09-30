@@ -1,38 +1,36 @@
 # Jyotish Cosmic 🌌
 
-Jyotish Cosmic is an advanced, AI-powered Vedic Astrology application for Android. It seamlessly fuses the ancient, mathematically rigorous rules of traditional Hindu astrology (Jyotish) with cutting-edge artificial intelligence to provide highly accurate, beautifully presented, and deeply personalized astrological insights.
+Jyotish Cosmic is a Vedic Astrology application for Android built with Flutter. It combines the traditional, table-driven rules of Jyotish with optional AI interpretations. All calculations happen on the device with the Swiss Ephemeris, and all profiles stay on the device.
 
 ## Features ✨
 
-- **Exact Astronomical Calculations:** Powered by the state-of-the-art Swiss Ephemeris (`swisseph`), ensuring pinpoint precision for planetary longitudes, ascendants (Lagna), and house cusps.
-- **Dynamic Birth Charts:** Renders authentic North Indian and South Indian style Kundali charts interactively, complete with exact planetary degrees and zodiac mapping.
-- **Ashtakoot Guna Milan (Matchmaking):** A strict, table-driven implementation of the traditional 36-point Ashtakoot compatibility system, including Varna, Vashya, Tara, Yoni, Graha Maitri, Gana, Bhakoot, and Nadi Kootas.
-- **AI-Driven Interpretations:** Connects directly to OpenAI's GPT-4o (or compatible models) via your own API key to generate deep, personalized readings of your birth chart and matchmaking compatibility.
-- **Profile Management:** Store and manage unlimited profiles seamlessly using secure, local SQLite databases.
-- **Live Over-The-Air (OTA) Updates:** Built-in seamless update functionality. Keep your app up to date directly from GitHub releases or a local development server without needing the Play Store.
+- **Swiss Ephemeris calculations:** Planetary longitudes, speeds (retrogression), the ascendant, Placidus cusps, sunrise/sunset and solar returns come from the Swiss Ephemeris ([`sweph`](https://pub.dev/packages/sweph)). The bundled `sepl_18`/`semo_18` files cover 1800–2400 CE; outside that range Swiss Ephemeris falls back to its built-in Moshier ephemeris. Sidereal zodiac with Lahiri ayanamsa (Krishnamurti ayanamsa for KP), mean lunar nodes.
+- **Birth charts:** North, South and East Indian chart styles with degrees and retrograde markers; the 16 Shodashvarga divisional charts.
+- **Vimshottari Dasha:** Mahadasha, Antardasha and Pratyantardasha with the exact balance at birth.
+- **Panchang:** Tithi, Nakshatra, Yoga, Karana and Vara (sunrise to sunrise), with sunrise/sunset, Rahu Kaal, Yamaganda and Gulika — for today or at birth.
+- **Ashtakoot Guna Milan:** The 36-point system (Varna, Vashya, Tara, Yoni, Graha Maitri, Gana, Bhakoot, Nadi) using the standard tables, plus Manglik comparison.
+- **Also included:** Transits (Gochar), Varshaphal (annual chart), KP system (star and sub lords), yogas, doshas (Manglik, Kaal Sarp, Sade Sati, Pitru, Grahan, Guru Chandal, Kemadruma), planetary avasthas, Lal Kitab and remedies.
+- **Offline birthplace search:** A bundled GeoNames extract (about 70,000 places, including all Indian towns above 1,000 people) with IANA time zones. The UTC offset at birth is derived automatically, including daylight saving time and historical offsets.
+- **Optional AI interpretations:** OpenAI, Anthropic (Claude), Gemini, DeepSeek, Grok, or any OpenAI-compatible server (for example a local Ollama). Uses your own API key; answers are rendered as Markdown and can be saved to a profile.
+- **PDF export:** Birth chart report and AI life report.
 
 ## Privacy First 🛡️
 
-Jyotish Cosmic respects your privacy. All your deeply personal birth data is stored **100% locally** on your device using SQLite. Your data only leaves your device when you explicitly request an AI interpretation, at which point the required astrological data is sent securely to the LLM endpoint you configure using your own API key.
+Jyotish Cosmic has no account and no cloud storage. Profiles are stored only in a local SQLite database. The only network requests the app makes are:
+
+- an AI interpretation that you explicitly request, sent to the provider you configured with your key;
+- the manual "Check for Updates" button, which queries GitHub releases.
+
+Fonts, ephemeris files and the city database are bundled with the app.
 
 ## Architecture 🛠️
 
-- **Framework:** Flutter (Dart)
-- **State Management:** Riverpod
-- **Local Storage:** SQLite (sqflite)
-- **Astrology Engine:** Swiss Ephemeris (`swisseph_api`)
-- **AI Integration:** Direct REST API (`dio`) with Markdown rendering.
-
-## Setup & Installation 🚀
-
-1. Download the latest `app-release.apk` from the Releases page.
-2. Install the APK on your Android device. (Make sure "Install from Unknown Sources" is enabled in your Android settings).
-3. Open the app, navigate to **Settings**, and enter your OpenAI API key to unlock the AI interpretation engine.
-4. Add your profile in the **Profiles** tab and begin your cosmic journey!
+- **Framework:** Flutter (Dart), Riverpod
+- **Local storage:** SQLite via Drift
+- **Astronomy engine:** Swiss Ephemeris (`sweph` FFI plugin)
+- **Time zones:** `timezone` (IANA database, bundled)
 
 ## Building from Source 💻
-
-If you wish to compile the app yourself:
 
 ```bash
 git clone https://github.com/mryogeshkumargit/JyotishCosmic.git
@@ -41,4 +39,21 @@ flutter pub get
 flutter build apk
 ```
 
-The resulting APK will be located at `build/app/outputs/flutter-apk/app-release.apk`.
+The APK is written to `build/app/outputs/flutter-apk/app-release.apk`.
+
+### Running the tests
+
+The Swiss Ephemeris tests need a host build of the native library (Flutter plugins are not loaded in unit tests):
+
+```bash
+tool/build_sweph_test_lib.sh   # compiles libsweph for your machine into build/test_native
+flutter test
+```
+
+Without that step, the ephemeris-dependent tests are skipped.
+
+## Licensing and attributions
+
+- The Swiss Ephemeris is © Astrodienst AG and is used under the GNU AGPL-3.0 (through the `sweph` package). Distributing the app therefore requires its source code to be available under AGPL-compatible terms, unless you hold a Swiss Ephemeris Professional License.
+- City data © [GeoNames](https://www.geonames.org/), licensed under CC BY 4.0.
+- Fonts: Inter, Cinzel and Noto Sans Devanagari (SIL Open Font License).

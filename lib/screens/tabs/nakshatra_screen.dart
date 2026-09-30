@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../core/ephemeris.dart';
 import '../../core/vedic_math.dart';
 
@@ -30,7 +31,7 @@ class NakshatraScreen extends StatelessWidget {
                   children: [
                     Text('Your Birth Nakshatra', style: TextStyle(color: Theme.of(context).colorScheme.secondary, fontSize: 14)),
                     const SizedBox(height: 8),
-                    Text(moonNak.name, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, fontFamily: 'Cinzel')),
+                    Text(moonNak.name, style: GoogleFonts.cinzel(fontSize: 32, fontWeight: FontWeight.bold)),
                     Text(moonNak.hindi, style: const TextStyle(fontSize: 24, color: Colors.amber)),
                     const SizedBox(height: 16),
                     Text('Pada $moonPada', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
@@ -45,7 +46,7 @@ class NakshatraScreen extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.5),
+                        color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.5),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Column(
@@ -79,8 +80,8 @@ class NakshatraScreen extends StatelessWidget {
                 bool isCurrent = index == moonNakIdx;
                 return Container(
                   decoration: BoxDecoration(
-                    color: isCurrent ? Colors.amber.withOpacity(0.2) : Theme.of(context).cardColor,
-                    border: Border.all(color: isCurrent ? Colors.amber : Colors.grey.withOpacity(0.2)),
+                    color: isCurrent ? Colors.amber.withValues(alpha: 0.2) : Theme.of(context).cardColor,
+                    border: Border.all(color: isCurrent ? Colors.amber : Colors.grey.withValues(alpha: 0.2)),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Column(
@@ -89,7 +90,7 @@ class NakshatraScreen extends StatelessWidget {
                       Text('${index + 1}', style: TextStyle(color: isCurrent ? Colors.amber : Colors.grey, fontSize: 12)),
                       Text(nak.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12), textAlign: TextAlign.center),
                       Text(nak.hindi, style: TextStyle(color: Theme.of(context).colorScheme.secondary, fontSize: 12)),
-                      Text(nak.lord, style: const TextStyle(color: Colors.grey, fontSize: 10)),
+                      Text(VedicMath.planets[nak.lord]!.name, style: const TextStyle(color: Colors.grey, fontSize: 10)),
                     ],
                   ),
                 );

@@ -47,7 +47,7 @@ class DoshasMath {
     String dignity = PlanetaryDignity.getAdvancedDignity('mars', marsRashi, planetRashis);
     
     if (dignity == 'Exalted') exceptions.add('Mars is Exalted (cancelled/reduced)');
-    if (dignity == 'Own Sign') exceptions.add('Mars is in Own Sign (cancelled/reduced)');
+    if (dignity == 'Own Sign' || dignity == 'Moolatrikona') exceptions.add('Mars is in its own sign (cancelled/reduced)');
     
     if (planetLongitudes.containsKey('jupiter')) {
       int jupRashi = VedicMath.rashiIndex(planetLongitudes['jupiter']!);
@@ -56,7 +56,7 @@ class DoshasMath {
     }
 
     int severityCount = [dl, dm, dv].where((e) => e).length;
-    String severity = severityCount == 3 ? 'High' : severityCount == 2 ? 'Medium' : 'Low';
+    String severity = severityCount == 3 ? 'High' : severityCount == 2 ? 'Medium' : severityCount == 1 ? 'Low' : '';
     
     return DoshaResult(
       name: 'Manglik Dosha',
@@ -64,12 +64,17 @@ class DoshasMath {
       present: (dl || dm || dv) && exceptions.isEmpty,
       severity: severity,
       exceptions: exceptions,
-      description: 'Mars in 1st, 2nd, 4th, 7th, 8th or 12th house — can affect marital harmony.',
+      conditions: [
+        if (dl) 'Mars in house $fl from Lagna',
+        if (dm) 'Mars in house $fm from Moon',
+        if (dv) 'Mars in house $fv from Venus',
+      ],
+      description: 'Mars in 1st, 2nd, 4th, 7th, 8th or 12th house (from Lagna, Moon or Venus) — can affect marital harmony.',
       remedies: ['Worship Hanuman on Tuesdays', 'Recite Mangal Stotra daily', 'Red Coral gemstone (consult astrologer)', 'Kumbh Vivah before marriage', 'Donate red lentils on Tuesdays'],
     );
   }
 
-  static DoshaResult? computeKaalSarp(Map<String, double> longs) {
+  static DoshaResult? computeKaalSarp(Map<String, double> longs, int lagnaRashi) {
     if (!longs.containsKey('rahu') || !longs.containsKey('ketu')) return null;
     double rd = longs['rahu']!;
     List<String> planets7 = ['sun', 'moon', 'mars', 'mercury', 'jupiter', 'venus', 'saturn'];
@@ -87,13 +92,14 @@ class DoshasMath {
     }
     
     List<String> types = ['Anant', 'Kulik', 'Vasuki', 'Shankhapal', 'Padma', 'Mahapadma', 'Takshak', 'Karkotak', 'Shankhachood', 'Ghatak', 'Vishdhar', 'Sheshnaag'];
-    int rahuRashi = VedicMath.rashiIndex(rd);
+    // The type is named after Rahu's house from the Lagna (Anant = 1st ... Sheshnaag = 12th).
+    int rahuHouse = VedicMath.houseOf(VedicMath.rashiIndex(rd), lagnaRashi);
     
     return DoshaResult(
       name: 'Kaal Sarp Dosha',
       hindi: 'काल सर्प दोष',
       present: outside.isEmpty || between.isEmpty,
-      conditions: ['Type: ${types[rahuRashi % 12]}'],
+      conditions: ['Type: ${types[rahuHouse - 1]} (Rahu in house $rahuHouse)'],
       description: 'All 7 planets between Rahu & Ketu — challenges in progress, recurring obstacles.',
       remedies: ['Shiva worship on Mondays', 'Kaal Sarp Shanti puja at Trimbakeshwar', 'Maha Mrityunjaya Mantra 108×', 'Silver bangle on left wrist', 'Donate food on Saturdays'],
     );
@@ -103,9 +109,13 @@ class DoshasMath {
     int prev = (moonRashi - 1 + 12) % 12;
     int next = (moonRashi + 1) % 12;
     String? phase;
-    if (saturnRashi == prev) phase = 'Rising (1st Phase)';
-    else if (saturnRashi == moonRashi) phase = 'Peak (2nd Phase)';
-    else if (saturnRashi == next) phase = 'Setting (3rd Phase)';
+    if (saturnRashi == prev) {
+      phase = 'Rising (1st Phase)';
+    } else if (saturnRashi == moonRashi) {
+      phase = 'Peak (2nd Phase)';
+    } else if (saturnRashi == next) {
+      phase = 'Setting (3rd Phase)';
+    }
     
     return DoshaResult(
       name: 'Shani Sadesati',
@@ -141,13 +151,19 @@ class DoshasMath {
     );
   }
 
+  static double _separation(double a, double b) {
+    final d = VedicMath.norm360(a - b);
+    return d > 180 ? 360 - d : d;
+  }
+
   static DoshaResult computeGrahanDosha(Map<String, double> longs) {
     List<String> cond = [];
-    if (longs.containsKey('sun') && longs.containsKey('rahu') && (longs['sun']! - longs['rahu']!).abs() < 10) cond.add('Sun within 10° of Rahu (Solar Eclipse energy)');
-    if (longs.containsKey('moon') && longs.containsKey('rahu') && (longs['moon']! - longs['rahu']!).abs() < 10) cond.add('Moon within 10° of Rahu (Lunar Eclipse energy)');
-    if (longs.containsKey('sun') && longs.containsKey('ketu') && (longs['sun']! - longs['ketu']!).abs() < 10) cond.add('Sun within 10° of Ketu');
-    if (longs.containsKey('moon') && longs.containsKey('ketu') && (longs['moon']! - longs['ketu']!).abs() < 10) cond.add('Moon within 10° of Ketu');
-    
+    bool near(String a, String b) => longs.containsKey(a) && longs.containsKey(b) && _separation(longs[a]!, longs[b]!) < 10;
+    if (near('sun', 'rahu')) cond.add('Sun within 10° of Rahu (Solar Eclipse energy)');
+    if (near('moon', 'rahu')) cond.add('Moon within 10° of Rahu (Lunar Eclipse energy)');
+    if (near('sun', 'ketu')) cond.add('Sun within 10° of Ketu');
+    if (near('moon', 'ketu')) cond.add('Moon within 10° of Ketu');
+
     return DoshaResult(
       name: 'Grahan Dosha',
       hindi: 'ग्रहण दोष',
@@ -184,31 +200,32 @@ class DoshasMath {
     );
   }
 
+  /// Kemadruma: no planet (other than Sun, Rahu, Ketu) in the 2nd or 12th from the Moon.
+  /// Cancelled when a planet is conjunct the Moon or in a kendra from the Moon.
   static DoshaResult computeKemadrumaDosha(Map<String, double> longs) {
     if (!longs.containsKey('moon')) {
       return DoshaResult(name: 'Kemadruma Dosha', hindi: 'केमद्रुम दोष', present: false, description: '', remedies: []);
     }
-    
-    int moonRashi = VedicMath.rashiIndex(longs['moon']!);
-    int secondFromMoon = (moonRashi + 1) % 12;
-    int twelfthFromMoon = (moonRashi + 11) % 12;
 
-    List<String> truePlanets = ['mars', 'mercury', 'jupiter', 'venus', 'saturn'];
+    final int moonRashi = VedicMath.rashiIndex(longs['moon']!);
+    const List<String> truePlanets = ['mars', 'mercury', 'jupiter', 'venus', 'saturn'];
 
-    bool hasPlanetsIn2ndOr12th = false;
-    longs.forEach((p, sid) {
-      if (!truePlanets.contains(p)) return;
-      int r = VedicMath.rashiIndex(sid);
-      if (r == secondFromMoon || r == twelfthFromMoon || r == moonRashi) { // Any planet with Moon cancels it usually, but let's strictly check 2nd and 12th
-        hasPlanetsIn2ndOr12th = true;
-      }
-    });
+    bool adjacent = false;
+    final List<String> cancellations = [];
+    for (final p in truePlanets) {
+      if (!longs.containsKey(p)) continue;
+      final int h = VedicMath.houseOf(VedicMath.rashiIndex(longs[p]!), moonRashi);
+      if (h == 2 || h == 12) adjacent = true;
+      if (h == 1) cancellations.add('${VedicMath.planets[p]!.name} conjunct Moon');
+      if (h == 4 || h == 7 || h == 10) cancellations.add('${VedicMath.planets[p]!.name} in kendra from Moon');
+    }
 
-    // Also usually cancelled if Kendras from Moon or Lagna have planets, but we keep it simple here.
+    final bool formed = !adjacent;
     return DoshaResult(
       name: 'Kemadruma Dosha',
       hindi: 'केमद्रुम दोष',
-      present: !hasPlanetsIn2ndOr12th,
+      present: formed && cancellations.isEmpty,
+      exceptions: formed ? cancellations : const [],
       description: 'Moon without planets on either side. Brings loneliness, mental unrest, and struggles.',
       remedies: ['Worship Lord Shiva daily', 'Offer milk on Shivling', 'Keep a silver piece or square with you'],
     );
