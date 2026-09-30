@@ -131,6 +131,32 @@ class $ProfilesTable extends Profiles with TableInfo<$ProfilesTable, Profile> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _cloudflareIdMeta = const VerificationMeta(
+    'cloudflareId',
+  );
+  @override
+  late final GeneratedColumn<String> cloudflareId = GeneratedColumn<String>(
+    'cloudflare_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _needsSyncMeta = const VerificationMeta(
+    'needsSync',
+  );
+  @override
+  late final GeneratedColumn<bool> needsSync = GeneratedColumn<bool>(
+    'needs_sync',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("needs_sync" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -145,6 +171,8 @@ class $ProfilesTable extends Profiles with TableInfo<$ProfilesTable, Profile> {
     timezone,
     tzName,
     gender,
+    cloudflareId,
+    needsSync,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -240,6 +268,21 @@ class $ProfilesTable extends Profiles with TableInfo<$ProfilesTable, Profile> {
         gender.isAcceptableOrUnknown(data['gender']!, _genderMeta),
       );
     }
+    if (data.containsKey('cloudflare_id')) {
+      context.handle(
+        _cloudflareIdMeta,
+        cloudflareId.isAcceptableOrUnknown(
+          data['cloudflare_id']!,
+          _cloudflareIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('needs_sync')) {
+      context.handle(
+        _needsSyncMeta,
+        needsSync.isAcceptableOrUnknown(data['needs_sync']!, _needsSyncMeta),
+      );
+    }
     return context;
   }
 
@@ -297,6 +340,14 @@ class $ProfilesTable extends Profiles with TableInfo<$ProfilesTable, Profile> {
         DriftSqlType.string,
         data['${effectivePrefix}gender'],
       ),
+      cloudflareId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}cloudflare_id'],
+      ),
+      needsSync: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}needs_sync'],
+      )!,
     );
   }
 
@@ -325,6 +376,12 @@ class Profile extends DataClass implements Insertable<Profile> {
 
   /// 'Male' / 'Female' (optional).
   final String? gender;
+
+  /// Id of this profile on the sync server (null until first uploaded).
+  final String? cloudflareId;
+
+  /// True when local changes have not been uploaded yet.
+  final bool needsSync;
   const Profile({
     required this.id,
     required this.name,
@@ -338,6 +395,8 @@ class Profile extends DataClass implements Insertable<Profile> {
     required this.timezone,
     this.tzName,
     this.gender,
+    this.cloudflareId,
+    required this.needsSync,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -360,6 +419,10 @@ class Profile extends DataClass implements Insertable<Profile> {
     if (!nullToAbsent || gender != null) {
       map['gender'] = Variable<String>(gender);
     }
+    if (!nullToAbsent || cloudflareId != null) {
+      map['cloudflare_id'] = Variable<String>(cloudflareId);
+    }
+    map['needs_sync'] = Variable<bool>(needsSync);
     return map;
   }
 
@@ -383,6 +446,10 @@ class Profile extends DataClass implements Insertable<Profile> {
       gender: gender == null && nullToAbsent
           ? const Value.absent()
           : Value(gender),
+      cloudflareId: cloudflareId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(cloudflareId),
+      needsSync: Value(needsSync),
     );
   }
 
@@ -404,6 +471,8 @@ class Profile extends DataClass implements Insertable<Profile> {
       timezone: serializer.fromJson<double>(json['timezone']),
       tzName: serializer.fromJson<String?>(json['tzName']),
       gender: serializer.fromJson<String?>(json['gender']),
+      cloudflareId: serializer.fromJson<String?>(json['cloudflareId']),
+      needsSync: serializer.fromJson<bool>(json['needsSync']),
     );
   }
   @override
@@ -422,6 +491,8 @@ class Profile extends DataClass implements Insertable<Profile> {
       'timezone': serializer.toJson<double>(timezone),
       'tzName': serializer.toJson<String?>(tzName),
       'gender': serializer.toJson<String?>(gender),
+      'cloudflareId': serializer.toJson<String?>(cloudflareId),
+      'needsSync': serializer.toJson<bool>(needsSync),
     };
   }
 
@@ -438,6 +509,8 @@ class Profile extends DataClass implements Insertable<Profile> {
     double? timezone,
     Value<String?> tzName = const Value.absent(),
     Value<String?> gender = const Value.absent(),
+    Value<String?> cloudflareId = const Value.absent(),
+    bool? needsSync,
   }) => Profile(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -453,6 +526,8 @@ class Profile extends DataClass implements Insertable<Profile> {
     timezone: timezone ?? this.timezone,
     tzName: tzName.present ? tzName.value : this.tzName,
     gender: gender.present ? gender.value : this.gender,
+    cloudflareId: cloudflareId.present ? cloudflareId.value : this.cloudflareId,
+    needsSync: needsSync ?? this.needsSync,
   );
   Profile copyWithCompanion(ProfilesCompanion data) {
     return Profile(
@@ -470,6 +545,10 @@ class Profile extends DataClass implements Insertable<Profile> {
       timezone: data.timezone.present ? data.timezone.value : this.timezone,
       tzName: data.tzName.present ? data.tzName.value : this.tzName,
       gender: data.gender.present ? data.gender.value : this.gender,
+      cloudflareId: data.cloudflareId.present
+          ? data.cloudflareId.value
+          : this.cloudflareId,
+      needsSync: data.needsSync.present ? data.needsSync.value : this.needsSync,
     );
   }
 
@@ -487,7 +566,9 @@ class Profile extends DataClass implements Insertable<Profile> {
           ..write('aiInterpretation: $aiInterpretation, ')
           ..write('timezone: $timezone, ')
           ..write('tzName: $tzName, ')
-          ..write('gender: $gender')
+          ..write('gender: $gender, ')
+          ..write('cloudflareId: $cloudflareId, ')
+          ..write('needsSync: $needsSync')
           ..write(')'))
         .toString();
   }
@@ -506,6 +587,8 @@ class Profile extends DataClass implements Insertable<Profile> {
     timezone,
     tzName,
     gender,
+    cloudflareId,
+    needsSync,
   );
   @override
   bool operator ==(Object other) =>
@@ -522,7 +605,9 @@ class Profile extends DataClass implements Insertable<Profile> {
           other.aiInterpretation == this.aiInterpretation &&
           other.timezone == this.timezone &&
           other.tzName == this.tzName &&
-          other.gender == this.gender);
+          other.gender == this.gender &&
+          other.cloudflareId == this.cloudflareId &&
+          other.needsSync == this.needsSync);
 }
 
 class ProfilesCompanion extends UpdateCompanion<Profile> {
@@ -538,6 +623,8 @@ class ProfilesCompanion extends UpdateCompanion<Profile> {
   final Value<double> timezone;
   final Value<String?> tzName;
   final Value<String?> gender;
+  final Value<String?> cloudflareId;
+  final Value<bool> needsSync;
   const ProfilesCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
@@ -551,6 +638,8 @@ class ProfilesCompanion extends UpdateCompanion<Profile> {
     this.timezone = const Value.absent(),
     this.tzName = const Value.absent(),
     this.gender = const Value.absent(),
+    this.cloudflareId = const Value.absent(),
+    this.needsSync = const Value.absent(),
   });
   ProfilesCompanion.insert({
     this.id = const Value.absent(),
@@ -565,6 +654,8 @@ class ProfilesCompanion extends UpdateCompanion<Profile> {
     this.timezone = const Value.absent(),
     this.tzName = const Value.absent(),
     this.gender = const Value.absent(),
+    this.cloudflareId = const Value.absent(),
+    this.needsSync = const Value.absent(),
   }) : name = Value(name),
        dob = Value(dob),
        pob = Value(pob),
@@ -583,6 +674,8 @@ class ProfilesCompanion extends UpdateCompanion<Profile> {
     Expression<double>? timezone,
     Expression<String>? tzName,
     Expression<String>? gender,
+    Expression<String>? cloudflareId,
+    Expression<bool>? needsSync,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -597,6 +690,8 @@ class ProfilesCompanion extends UpdateCompanion<Profile> {
       if (timezone != null) 'timezone': timezone,
       if (tzName != null) 'tz_name': tzName,
       if (gender != null) 'gender': gender,
+      if (cloudflareId != null) 'cloudflare_id': cloudflareId,
+      if (needsSync != null) 'needs_sync': needsSync,
     });
   }
 
@@ -613,6 +708,8 @@ class ProfilesCompanion extends UpdateCompanion<Profile> {
     Value<double>? timezone,
     Value<String?>? tzName,
     Value<String?>? gender,
+    Value<String?>? cloudflareId,
+    Value<bool>? needsSync,
   }) {
     return ProfilesCompanion(
       id: id ?? this.id,
@@ -627,6 +724,8 @@ class ProfilesCompanion extends UpdateCompanion<Profile> {
       timezone: timezone ?? this.timezone,
       tzName: tzName ?? this.tzName,
       gender: gender ?? this.gender,
+      cloudflareId: cloudflareId ?? this.cloudflareId,
+      needsSync: needsSync ?? this.needsSync,
     );
   }
 
@@ -669,6 +768,12 @@ class ProfilesCompanion extends UpdateCompanion<Profile> {
     if (gender.present) {
       map['gender'] = Variable<String>(gender.value);
     }
+    if (cloudflareId.present) {
+      map['cloudflare_id'] = Variable<String>(cloudflareId.value);
+    }
+    if (needsSync.present) {
+      map['needs_sync'] = Variable<bool>(needsSync.value);
+    }
     return map;
   }
 
@@ -686,7 +791,176 @@ class ProfilesCompanion extends UpdateCompanion<Profile> {
           ..write('aiInterpretation: $aiInterpretation, ')
           ..write('timezone: $timezone, ')
           ..write('tzName: $tzName, ')
-          ..write('gender: $gender')
+          ..write('gender: $gender, ')
+          ..write('cloudflareId: $cloudflareId, ')
+          ..write('needsSync: $needsSync')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $PendingDeletionsTable extends PendingDeletions
+    with TableInfo<$PendingDeletionsTable, PendingDeletion> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PendingDeletionsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _cloudIdMeta = const VerificationMeta(
+    'cloudId',
+  );
+  @override
+  late final GeneratedColumn<String> cloudId = GeneratedColumn<String>(
+    'cloud_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [cloudId];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'pending_deletions';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<PendingDeletion> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('cloud_id')) {
+      context.handle(
+        _cloudIdMeta,
+        cloudId.isAcceptableOrUnknown(data['cloud_id']!, _cloudIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_cloudIdMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {cloudId};
+  @override
+  PendingDeletion map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PendingDeletion(
+      cloudId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}cloud_id'],
+      )!,
+    );
+  }
+
+  @override
+  $PendingDeletionsTable createAlias(String alias) {
+    return $PendingDeletionsTable(attachedDatabase, alias);
+  }
+}
+
+class PendingDeletion extends DataClass implements Insertable<PendingDeletion> {
+  final String cloudId;
+  const PendingDeletion({required this.cloudId});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['cloud_id'] = Variable<String>(cloudId);
+    return map;
+  }
+
+  PendingDeletionsCompanion toCompanion(bool nullToAbsent) {
+    return PendingDeletionsCompanion(cloudId: Value(cloudId));
+  }
+
+  factory PendingDeletion.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PendingDeletion(
+      cloudId: serializer.fromJson<String>(json['cloudId']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{'cloudId': serializer.toJson<String>(cloudId)};
+  }
+
+  PendingDeletion copyWith({String? cloudId}) =>
+      PendingDeletion(cloudId: cloudId ?? this.cloudId);
+  PendingDeletion copyWithCompanion(PendingDeletionsCompanion data) {
+    return PendingDeletion(
+      cloudId: data.cloudId.present ? data.cloudId.value : this.cloudId,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PendingDeletion(')
+          ..write('cloudId: $cloudId')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => cloudId.hashCode;
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PendingDeletion && other.cloudId == this.cloudId);
+}
+
+class PendingDeletionsCompanion extends UpdateCompanion<PendingDeletion> {
+  final Value<String> cloudId;
+  final Value<int> rowid;
+  const PendingDeletionsCompanion({
+    this.cloudId = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  PendingDeletionsCompanion.insert({
+    required String cloudId,
+    this.rowid = const Value.absent(),
+  }) : cloudId = Value(cloudId);
+  static Insertable<PendingDeletion> custom({
+    Expression<String>? cloudId,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (cloudId != null) 'cloud_id': cloudId,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  PendingDeletionsCompanion copyWith({
+    Value<String>? cloudId,
+    Value<int>? rowid,
+  }) {
+    return PendingDeletionsCompanion(
+      cloudId: cloudId ?? this.cloudId,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (cloudId.present) {
+      map['cloud_id'] = Variable<String>(cloudId.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PendingDeletionsCompanion(')
+          ..write('cloudId: $cloudId, ')
+          ..write('rowid: $rowid')
           ..write(')'))
         .toString();
   }
@@ -696,11 +970,17 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $ProfilesTable profiles = $ProfilesTable(this);
+  late final $PendingDeletionsTable pendingDeletions = $PendingDeletionsTable(
+    this,
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
-  List<DatabaseSchemaEntity> get allSchemaEntities => [profiles];
+  List<DatabaseSchemaEntity> get allSchemaEntities => [
+    profiles,
+    pendingDeletions,
+  ];
 }
 
 typedef $$ProfilesTableCreateCompanionBuilder =
@@ -717,6 +997,8 @@ typedef $$ProfilesTableCreateCompanionBuilder =
       Value<double> timezone,
       Value<String?> tzName,
       Value<String?> gender,
+      Value<String?> cloudflareId,
+      Value<bool> needsSync,
     });
 typedef $$ProfilesTableUpdateCompanionBuilder =
     ProfilesCompanion Function({
@@ -732,6 +1014,8 @@ typedef $$ProfilesTableUpdateCompanionBuilder =
       Value<double> timezone,
       Value<String?> tzName,
       Value<String?> gender,
+      Value<String?> cloudflareId,
+      Value<bool> needsSync,
     });
 
 class $$ProfilesTableFilterComposer
@@ -800,6 +1084,16 @@ class $$ProfilesTableFilterComposer
 
   ColumnFilters<String> get gender => $composableBuilder(
     column: $table.gender,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get cloudflareId => $composableBuilder(
+    column: $table.cloudflareId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get needsSync => $composableBuilder(
+    column: $table.needsSync,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -872,6 +1166,16 @@ class $$ProfilesTableOrderingComposer
     column: $table.gender,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get cloudflareId => $composableBuilder(
+    column: $table.cloudflareId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get needsSync => $composableBuilder(
+    column: $table.needsSync,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$ProfilesTableAnnotationComposer
@@ -920,6 +1224,14 @@ class $$ProfilesTableAnnotationComposer
 
   GeneratedColumn<String> get gender =>
       $composableBuilder(column: $table.gender, builder: (column) => column);
+
+  GeneratedColumn<String> get cloudflareId => $composableBuilder(
+    column: $table.cloudflareId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get needsSync =>
+      $composableBuilder(column: $table.needsSync, builder: (column) => column);
 }
 
 class $$ProfilesTableTableManager
@@ -962,6 +1274,8 @@ class $$ProfilesTableTableManager
                 Value<double> timezone = const Value.absent(),
                 Value<String?> tzName = const Value.absent(),
                 Value<String?> gender = const Value.absent(),
+                Value<String?> cloudflareId = const Value.absent(),
+                Value<bool> needsSync = const Value.absent(),
               }) => ProfilesCompanion(
                 id: id,
                 name: name,
@@ -975,6 +1289,8 @@ class $$ProfilesTableTableManager
                 timezone: timezone,
                 tzName: tzName,
                 gender: gender,
+                cloudflareId: cloudflareId,
+                needsSync: needsSync,
               ),
           createCompanionCallback:
               ({
@@ -990,6 +1306,8 @@ class $$ProfilesTableTableManager
                 Value<double> timezone = const Value.absent(),
                 Value<String?> tzName = const Value.absent(),
                 Value<String?> gender = const Value.absent(),
+                Value<String?> cloudflareId = const Value.absent(),
+                Value<bool> needsSync = const Value.absent(),
               }) => ProfilesCompanion.insert(
                 id: id,
                 name: name,
@@ -1003,6 +1321,8 @@ class $$ProfilesTableTableManager
                 timezone: timezone,
                 tzName: tzName,
                 gender: gender,
+                cloudflareId: cloudflareId,
+                needsSync: needsSync,
               ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
@@ -1026,10 +1346,139 @@ typedef $$ProfilesTableProcessedTableManager =
       Profile,
       PrefetchHooks Function()
     >;
+typedef $$PendingDeletionsTableCreateCompanionBuilder =
+    PendingDeletionsCompanion Function({
+      required String cloudId,
+      Value<int> rowid,
+    });
+typedef $$PendingDeletionsTableUpdateCompanionBuilder =
+    PendingDeletionsCompanion Function({
+      Value<String> cloudId,
+      Value<int> rowid,
+    });
+
+class $$PendingDeletionsTableFilterComposer
+    extends Composer<_$AppDatabase, $PendingDeletionsTable> {
+  $$PendingDeletionsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get cloudId => $composableBuilder(
+    column: $table.cloudId,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$PendingDeletionsTableOrderingComposer
+    extends Composer<_$AppDatabase, $PendingDeletionsTable> {
+  $$PendingDeletionsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get cloudId => $composableBuilder(
+    column: $table.cloudId,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$PendingDeletionsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $PendingDeletionsTable> {
+  $$PendingDeletionsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get cloudId =>
+      $composableBuilder(column: $table.cloudId, builder: (column) => column);
+}
+
+class $$PendingDeletionsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $PendingDeletionsTable,
+          PendingDeletion,
+          $$PendingDeletionsTableFilterComposer,
+          $$PendingDeletionsTableOrderingComposer,
+          $$PendingDeletionsTableAnnotationComposer,
+          $$PendingDeletionsTableCreateCompanionBuilder,
+          $$PendingDeletionsTableUpdateCompanionBuilder,
+          (
+            PendingDeletion,
+            BaseReferences<
+              _$AppDatabase,
+              $PendingDeletionsTable,
+              PendingDeletion
+            >,
+          ),
+          PendingDeletion,
+          PrefetchHooks Function()
+        > {
+  $$PendingDeletionsTableTableManager(
+    _$AppDatabase db,
+    $PendingDeletionsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$PendingDeletionsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$PendingDeletionsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$PendingDeletionsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> cloudId = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PendingDeletionsCompanion(cloudId: cloudId, rowid: rowid),
+          createCompanionCallback:
+              ({
+                required String cloudId,
+                Value<int> rowid = const Value.absent(),
+              }) => PendingDeletionsCompanion.insert(
+                cloudId: cloudId,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$PendingDeletionsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $PendingDeletionsTable,
+      PendingDeletion,
+      $$PendingDeletionsTableFilterComposer,
+      $$PendingDeletionsTableOrderingComposer,
+      $$PendingDeletionsTableAnnotationComposer,
+      $$PendingDeletionsTableCreateCompanionBuilder,
+      $$PendingDeletionsTableUpdateCompanionBuilder,
+      (
+        PendingDeletion,
+        BaseReferences<_$AppDatabase, $PendingDeletionsTable, PendingDeletion>,
+      ),
+      PendingDeletion,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
   $AppDatabaseManager(this._db);
   $$ProfilesTableTableManager get profiles =>
       $$ProfilesTableTableManager(_db, _db.profiles);
+  $$PendingDeletionsTableTableManager get pendingDeletions =>
+      $$PendingDeletionsTableTableManager(_db, _db.pendingDeletions);
 }

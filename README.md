@@ -13,11 +13,13 @@ Jyotish Cosmic is a Vedic Astrology application for Android built with Flutter. 
 - **Offline birthplace search:** A bundled GeoNames extract (about 70,000 places, including all Indian towns above 1,000 people) with IANA time zones. The UTC offset at birth is derived automatically, including daylight saving time and historical offsets.
 - **Optional AI interpretations:** OpenAI, Anthropic (Claude), Gemini, DeepSeek, Grok, or any OpenAI-compatible server (for example a local Ollama). Uses your own API key; answers are rendered as Markdown and can be saved to a profile.
 - **PDF export:** Birth chart report and AI life report.
+- **Optional Cloud Sync:** Sign in under Settings → Cloud Sync to back up profiles and saved interpretations and keep them in sync across devices. The app remains fully usable offline; edits made offline are uploaded on the next sync.
 
 ## Privacy First 🛡️
 
-Jyotish Cosmic has no account and no cloud storage. Profiles are stored only in a local SQLite database. The only network requests the app makes are:
+Jyotish Cosmic works without an account. Profiles live in a local SQLite database, and all calculations run on the device. The app only uses the network for:
 
+- Cloud Sync, only if you sign in (profiles are sent to the sync server shown in Settings);
 - an AI interpretation that you explicitly request, sent to the provider you configured with your key;
 - the manual "Check for Updates" button, which queries GitHub releases.
 
@@ -40,6 +42,10 @@ flutter build apk
 ```
 
 The APK is written to `build/app/outputs/flutter-apk/app-release.apk`.
+
+### Test builds
+
+Every push runs the GitHub Actions workflow in `.github/workflows/android.yml`: analyze, the full test suite and a release APK. The APK is attached to the run as an artifact and published as a GitHub pre-release named "Test build N".
 
 ### Running the tests
 

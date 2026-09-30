@@ -2,9 +2,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart';
 import '../core/database.dart';
 import '../providers/database_provider.dart';
+import '../providers/sync_provider.dart';
 
 /// All saved profiles. Backed by a drift query stream so every screen updates
-/// as soon as the local database changes. Nothing is ever sent off-device.
+/// as soon as the local database changes (including changes pulled by sync).
 final profileListProvider = StreamProvider<List<Profile>>((ref) {
   final db = ref.watch(databaseProvider);
   return (db.select(db.profiles)..orderBy([(t) => OrderingTerm.asc(t.name)])).watch();
@@ -24,6 +25,8 @@ class ProfileNotifier extends Notifier<void> {
   @override
   void build() {}
 
+  void _sync() => ref.read(syncProvider.notifier).scheduleSync();
+
   /// Inserts a profile and returns its id. [dob] must be a wall-clock time
   /// encoded as UTC (see `encodeWallClock`).
   Future<int> addProfile({
@@ -35,9 +38,9 @@ class ProfileNotifier extends Notifier<void> {
     required double timezone,
     String? tzName,
     String? gender,
-  }) {
+  }) async {
     final db = ref.read(databaseProvider);
-    return db.into(db.profiles).insert(ProfilesCompanion.insert(
+    final id = await db.into(db.profiles).insert(ProfilesCompanion.insert(
       name: name,
       dob: dob,
       pob: pob,
@@ -47,16 +50,27 @@ class ProfileNotifier extends Notifier<void> {
       tzName: Value(tzName),
       gender: Value(gender),
     ));
+    _sync();
+    return id;
   }
 
   Future<void> updateProfile(Profile profile) async {
     final db = ref.read(databaseProvider);
-    await db.update(db.profiles).replace(profile.copyWith(updatedAt: DateTime.now()));
+    await db.update(db.profiles).replace(profile.copyWith(updatedAt: DateTime.now(), needsSync: true));
+    _sync();
   }
 
   Future<void> deleteProfile(Profile profile) async {
     final db = ref.read(databaseProvider);
-    await db.delete(db.profiles).delete(profile);
+    await db.transaction(() async {
+      // Remember uploaded profiles so the deletion reaches the server too.
+      if (profile.cloudflareId != null) {
+        await db.into(db.pendingDeletions).insertOnConflictUpdate(
+            PendingDeletionsCompanion.insert(cloudId: profile.cloudflareId!));
+      }
+      await db.delete(db.profiles).delete(profile);
+    });
+    _sync();
   }
 
   /// Appends an AI interpretation to the profile's saved interpretations.
@@ -73,7 +87,9 @@ class ProfileNotifier extends Notifier<void> {
       ProfilesCompanion(
         aiInterpretation: Value(newInterpretation),
         updatedAt: Value(DateTime.now()),
+        needsSync: const Value(true),
       ),
     );
+    _sync();
   }
 }

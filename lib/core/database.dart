@@ -7,7 +7,8 @@ import 'package:sqlite3/sqlite3.dart';
 
 part 'database.g.dart';
 
-/// Birth profiles, stored only in the on-device SQLite database.
+/// Birth profiles, stored in the on-device SQLite database and optionally
+/// synced to the cloud when the user signs in to Cloud Sync.
 ///
 /// [dob] holds the local wall-clock birth time encoded as a UTC [DateTime]
 /// (e.g. 05:30 local is stored as 05:30Z). This keeps the birth time stable
@@ -33,16 +34,30 @@ class Profiles extends Table {
 
   /// 'Male' / 'Female' (optional).
   TextColumn get gender => text().nullable()();
+
+  /// Id of this profile on the sync server (null until first uploaded).
+  TextColumn get cloudflareId => text().nullable()();
+
+  /// True when local changes have not been uploaded yet.
+  BoolColumn get needsSync => boolean().withDefault(const Constant(true))();
 }
 
-@DriftDatabase(tables: [Profiles])
+/// Cloud ids of profiles deleted locally whose deletion has not reached the server.
+class PendingDeletions extends Table {
+  TextColumn get cloudId => text()();
+
+  @override
+  Set<Column> get primaryKey => {cloudId};
+}
+
+@DriftDatabase(tables: [Profiles, PendingDeletions])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration {
@@ -73,9 +88,16 @@ class AppDatabase extends _$AppDatabase {
               updates: {profiles},
             );
           }
-
-          // Drop the obsolete cloud-sync columns (cloudflare_id, needs_sync).
-          await m.alterTable(TableMigration(profiles));
+        }
+        if (from < 5) {
+          // Cloud sync columns: present since schema 1, but may be missing on
+          // pre-release builds of schema 4 that dropped them.
+          final existing = (await customSelect('PRAGMA table_info(profiles)').get())
+              .map((r) => r.read<String>('name'))
+              .toSet();
+          if (!existing.contains('cloudflare_id')) await m.addColumn(profiles, profiles.cloudflareId);
+          if (!existing.contains('needs_sync')) await m.addColumn(profiles, profiles.needsSync);
+          await m.createTable(pendingDeletions);
         }
       },
     );

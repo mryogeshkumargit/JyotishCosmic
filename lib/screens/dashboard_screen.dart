@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/profile_provider.dart';
+import '../providers/sync_provider.dart';
 import 'kundali_screen.dart';
 import 'chat_screen.dart';
 import 'settings_screen.dart';
@@ -141,11 +142,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 backgroundColor: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.2),
                 backgroundImage: const AssetImage('assets/app_icon.png'),
               ),
-              Chip(
-                avatar: const Icon(Icons.offline_bolt, size: 16),
-                label: const Text('Offline', style: TextStyle(fontSize: 12)),
-                visualDensity: VisualDensity.compact,
-              ),
+              Consumer(builder: (context, ref, _) {
+                final synced = ref.watch(syncProvider.select((s) => s.signedIn));
+                return Chip(
+                  avatar: Icon(synced ? Icons.cloud_done : Icons.offline_bolt, size: 16),
+                  label: Text(synced ? 'Cloud sync on' : 'Offline', style: const TextStyle(fontSize: 12)),
+                  visualDensity: VisualDensity.compact,
+                );
+              }),
             ],
           ),
           const SizedBox(height: 24),

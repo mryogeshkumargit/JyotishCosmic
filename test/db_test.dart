@@ -31,7 +31,7 @@ void main() {
     expect(profile.aiInterpretation, 'Test Interpretation');
   });
 
-  test('migration from schema 3 drops cloud-sync columns and re-encodes birth time', () async {
+  test('migration from schema 3 keeps cloud-sync data and re-encodes birth time', () async {
     // A device-local instant as written by schema 3 (drift stores unix seconds).
     final oldLocal = DateTime(1985, 7, 4, 23, 45);
     final executor = NativeDatabase.memory(setup: (raw) {
@@ -62,10 +62,41 @@ void main() {
     final b = profile.birthWallClock;
     expect([b.year, b.month, b.day, b.hour, b.minute], [1985, 7, 4, 23, 45]);
 
+    expect(profile.cloudflareId, 'cf-1');
+    expect(profile.needsSync, isTrue);
+    expect(await db.select(db.pendingDeletions).get(), isEmpty);
     final columns = await db.customSelect('PRAGMA table_info(profiles)').get();
     final names = columns.map((r) => r.read<String>('name')).toSet();
-    expect(names.contains('cloudflare_id'), isFalse);
-    expect(names.contains('needs_sync'), isFalse);
-    expect(names.containsAll({'tz_name', 'gender'}), isTrue);
+    expect(names.containsAll({'tz_name', 'gender', 'cloudflare_id', 'needs_sync'}), isTrue);
+  });
+
+  test('migration from a schema 4 build without sync columns adds them back', () async {
+    final executor = NativeDatabase.memory(setup: (raw) {
+      raw.execute('''
+        CREATE TABLE profiles (
+          id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          dob INTEGER NOT NULL,
+          pob TEXT NOT NULL,
+          lat REAL NOT NULL,
+          lon REAL NOT NULL,
+          created_at INTEGER NOT NULL DEFAULT 0,
+          updated_at INTEGER NOT NULL DEFAULT 0,
+          ai_interpretation TEXT NULL,
+          timezone REAL NOT NULL DEFAULT 5.5,
+          tz_name TEXT NULL,
+          gender TEXT NULL
+        );
+      ''');
+      raw.execute("INSERT INTO profiles (name, dob, pob, lat, lon) VALUES ('New', 0, 'Pune', 18.5, 73.8)");
+      raw.execute('PRAGMA user_version = 4');
+    });
+    final db = AppDatabase.forTesting(executor);
+    addTearDown(db.close);
+
+    final profile = await db.select(db.profiles).getSingle();
+    expect(profile.cloudflareId, isNull);
+    expect(profile.needsSync, isTrue, reason: 'will be uploaded on first sync');
+    expect(await db.select(db.pendingDeletions).get(), isEmpty);
   });
 }

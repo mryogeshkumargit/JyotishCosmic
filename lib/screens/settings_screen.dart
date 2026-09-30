@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../providers/settings_provider.dart';
+import '../providers/sync_provider.dart';
 import '../services/ai_service.dart';
 import '../services/update_service.dart';
 
@@ -39,7 +40,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> with SingleTick
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _loadInitial();
     PackageInfo.fromPlatform().then((info) {
       if (mounted) setState(() => _version = info.version);
@@ -161,17 +162,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> with SingleTick
         title: const Text('Settings'),
         bottom: TabBar(
           controller: _tabController,
+          isScrollable: true,
+          tabAlignment: TabAlignment.center,
           indicatorColor: Theme.of(context).colorScheme.secondary,
           tabs: const [
             Tab(icon: Icon(Icons.palette), text: 'Style'),
             Tab(icon: Icon(Icons.smart_toy), text: 'AI Config'),
+            Tab(icon: Icon(Icons.cloud_sync), text: 'Cloud Sync'),
             Tab(icon: Icon(Icons.info), text: 'About'),
           ],
         ),
       ),
       body: TabBarView(
         controller: _tabController,
-        children: [_buildStyleTab(), _buildAIConfigTab(), _buildAboutTab()],
+        children: [_buildStyleTab(), _buildAIConfigTab(), const _CloudSyncTab(), _buildAboutTab()],
       ),
     );
   }
@@ -386,11 +390,187 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> with SingleTick
           const SizedBox(height: 16),
           Text(
             'Charts are computed on your device with the Swiss Ephemeris (Astrodienst AG, AGPL-3.0) using the sidereal '
-            'zodiac and Lahiri ayanamsa. Profiles are stored only in a local database. City data © GeoNames (CC BY 4.0).',
+            'zodiac and Lahiri ayanamsa. Profiles are stored in a local database and are uploaded only if you turn on '
+            'Cloud Sync. City data © GeoNames (CC BY 4.0).',
             textAlign: TextAlign.center,
             style: TextStyle(color: scheme.onSurfaceVariant, height: 1.5),
           ),
         ]),
+      ],
+    );
+  }
+}
+
+/// Optional cloud backup/sync of profiles across devices.
+class _CloudSyncTab extends ConsumerStatefulWidget {
+  const _CloudSyncTab();
+
+  @override
+  ConsumerState<_CloudSyncTab> createState() => _CloudSyncTabState();
+}
+
+class _CloudSyncTabState extends ConsumerState<_CloudSyncTab> {
+  final _email = TextEditingController();
+  final _password = TextEditingController();
+  final _server = TextEditingController();
+  bool _serverLoaded = false;
+  bool _obscure = true;
+
+  @override
+  void dispose() {
+    _email.dispose();
+    _password.dispose();
+    _server.dispose();
+    super.dispose();
+  }
+
+  bool _validate() {
+    final email = _email.text.trim();
+    String? error;
+    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
+      error = 'Please enter a valid email address';
+    } else if (_password.text.length < 6) {
+      error = 'Password must be at least 6 characters';
+    }
+    if (error != null) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+    return error == null;
+  }
+
+  Future<void> _auth(bool create) async {
+    if (!_validate()) return;
+    final notifier = ref.read(syncProvider.notifier);
+    await notifier.setServerUrl(_server.text);
+    final ok = create
+        ? await notifier.register(_email.text, _password.text)
+        : await notifier.signIn(_email.text, _password.text);
+    if (ok) _password.clear();
+  }
+
+  String _fmt(DateTime t) =>
+      '${t.year}-${t.month.toString().padLeft(2, '0')}-${t.day.toString().padLeft(2, '0')} '
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+  @override
+  Widget build(BuildContext context) {
+    final sync = ref.watch(syncProvider);
+    final scheme = Theme.of(context).colorScheme;
+    if (!_serverLoaded && !sync.loading) {
+      _server.text = sync.serverUrl;
+      _serverLoaded = true;
+    }
+
+    return ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(color: Colors.blue.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+          child: const Text(
+            'Cloud Sync is optional. The app works fully offline; when you sign in, your profiles and saved '
+            'interpretations are backed up to the server below and kept in sync across your devices.',
+            style: TextStyle(fontSize: 12),
+          ),
+        ),
+        const SizedBox(height: 24),
+        if (sync.loading)
+          const Center(child: CircularProgressIndicator())
+        else if (sync.signedIn) ...[
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.cloud_done, color: scheme.secondary, size: 36),
+            title: Text('Signed in as ${sync.email ?? ''}'),
+            subtitle: Text(sync.serverUrl),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            sync.busy
+                ? 'Syncing...'
+                : sync.lastSync == null
+                    ? 'Not synced yet'
+                    : 'Last sync: ${_fmt(sync.lastSync!)} (${sync.lastResult ?? ''})',
+            style: TextStyle(color: scheme.onSurfaceVariant),
+          ),
+          if (sync.error != null) ...[
+            const SizedBox(height: 8),
+            Text(sync.error!, style: TextStyle(color: scheme.error)),
+          ],
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: sync.busy ? null : () => ref.read(syncProvider.notifier).syncNow(),
+                  icon: sync.busy
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.sync),
+                  label: const Text('Sync now'),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: sync.busy ? null : () => ref.read(syncProvider.notifier).signOut(),
+                  icon: const Icon(Icons.logout),
+                  label: const Text('Sign out'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text('Signing out keeps all profiles on this device.',
+              style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12)),
+        ] else ...[
+          TextField(
+            controller: _server,
+            decoration: const InputDecoration(labelText: 'Sync server', prefixIcon: Icon(Icons.dns)),
+            keyboardType: TextInputType.url,
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _email,
+            decoration: const InputDecoration(labelText: 'Email', prefixIcon: Icon(Icons.email_outlined)),
+            keyboardType: TextInputType.emailAddress,
+            autofillHints: const [AutofillHints.email],
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _password,
+            obscureText: _obscure,
+            decoration: InputDecoration(
+              labelText: 'Password',
+              prefixIcon: const Icon(Icons.lock_outline),
+              suffixIcon: IconButton(
+                icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off),
+                onPressed: () => setState(() => _obscure = !_obscure),
+              ),
+            ),
+            autofillHints: const [AutofillHints.password],
+          ),
+          if (sync.error != null) ...[
+            const SizedBox(height: 12),
+            Text(sync.error!, style: TextStyle(color: scheme.error)),
+          ],
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: sync.busy ? null : () => _auth(false),
+                  child: sync.busy
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Text('Sign In'),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: sync.busy ? null : () => _auth(true),
+                  child: const Text('Create Account'),
+                ),
+              ),
+            ],
+          ),
+        ],
       ],
     );
   }

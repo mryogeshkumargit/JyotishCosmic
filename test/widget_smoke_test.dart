@@ -139,6 +139,9 @@ void main() {
     await settle(tester);
     await tester.tap(find.text('Settings'));
     await settle(tester);
+    await tester.tap(find.text('Cloud Sync'));
+    await settle(tester);
+    expect(find.text('Create Account'), findsOneWidget);
     expect(tester.takeException(), isNull);
     // Dispose widgets (and their drift stream subscriptions) before closing the database.
     await tester.pumpWidget(const SizedBox());
