@@ -17,7 +17,7 @@ class NakshatraScreen extends StatelessWidget {
     Planet lordPlanet = VedicMath.planets[moonNak.lord]!;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Nakshatra Details')),
+      appBar: AppBar(title: const Text('Nakshatra')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -31,7 +31,7 @@ class NakshatraScreen extends StatelessWidget {
                   children: [
                     Text('Your Birth Nakshatra', style: TextStyle(color: Theme.of(context).colorScheme.secondary, fontSize: 14)),
                     const SizedBox(height: 8),
-                    Text(moonNak.name, style: GoogleFonts.cinzel(fontSize: 32, fontWeight: FontWeight.bold)),
+                    Text(moonNak.name, textAlign: TextAlign.center, style: GoogleFonts.cinzel(fontSize: 32, fontWeight: FontWeight.bold)),
                     Text(moonNak.hindi, style: const TextStyle(fontSize: 24, color: Colors.amber)),
                     const SizedBox(height: 16),
                     Text('Pada $moonPada', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
@@ -84,7 +84,10 @@ class NakshatraScreen extends StatelessWidget {
                     border: Border.all(color: isCurrent ? Colors.amber : Colors.grey.withValues(alpha: 0.2)),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Column(
+                  padding: const EdgeInsets.all(4),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text('${index + 1}', style: TextStyle(color: isCurrent ? Colors.amber : Colors.grey, fontSize: 12)),
@@ -92,6 +95,7 @@ class NakshatraScreen extends StatelessWidget {
                       Text(nak.hindi, style: TextStyle(color: Theme.of(context).colorScheme.secondary, fontSize: 12)),
                       Text(VedicMath.planets[nak.lord]!.name, style: const TextStyle(color: Colors.grey, fontSize: 10)),
                     ],
+                  ),
                   ),
                 );
               },
@@ -106,10 +110,11 @@ class NakshatraScreen extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(color: Colors.grey)),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+          Expanded(child: Text(label, style: const TextStyle(color: Colors.grey))),
+          const SizedBox(width: 12),
+          Expanded(child: Text(value, textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.bold))),
         ],
       ),
     );

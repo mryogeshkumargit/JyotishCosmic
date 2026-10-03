@@ -28,6 +28,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> with SingleTick
   final _modelController = TextEditingController();
   bool _isTesting = false;
   bool _obscureKey = true;
+  bool _loadingModels = false;
+  String? _modelsStatus;
 
   // About / updater
   String _version = '';
@@ -61,6 +63,48 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> with SingleTick
       _apiKeyController.text = state.apiKey;
       _modelController.text = state.modelName;
     });
+    if (state.apiKey.isNotEmpty && !state.modelCache.containsKey(_selectedLLM)) {
+      _loadModels(quiet: true);
+    }
+  }
+
+  /// Loads the models available to this account from the provider.
+  Future<void> _loadModels({bool quiet = false}) async {
+    final provider = _selectedLLM;
+    setState(() {
+      _loadingModels = true;
+      _modelsStatus = null;
+    });
+    try {
+      final models = await AiService.listModels(_formState());
+      if (!mounted || provider != _selectedLLM) return;
+      if (models.isEmpty) {
+        setState(() => _modelsStatus = 'The provider returned no models; type the model id instead.');
+        return;
+      }
+      await ref.read(settingsProvider.notifier).cacheModels(provider, models);
+      if (!mounted) return;
+      setState(() => _modelsStatus = '${models.length} models loaded from $provider');
+    } catch (e) {
+      if (mounted && !quiet) setState(() => _modelsStatus = '$e');
+    } finally {
+      if (mounted) setState(() => _loadingModels = false);
+    }
+  }
+
+  Future<void> _pickModel() async {
+    final settings = ref.read(settingsProvider);
+    final provider = _selectedLLM;
+    final models = settings.modelsFor(provider);
+    final live = settings.modelCache[provider]?.isNotEmpty ?? false;
+    final current = _modelController.text.trim();
+    final chosen = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => _ModelPickerSheet(provider: provider, models: models, current: current, live: live),
+    );
+    if (chosen != null && mounted) setState(() => _modelController.text = chosen);
   }
 
   @override
@@ -77,8 +121,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> with SingleTick
     setState(() {
       _selectedLLM = newValue;
       _endpointController.text = LlmProviders.endpoints[newValue]!;
-      _modelController.text = LlmProviders.models[newValue]!.first;
+      _modelController.text = ref.read(settingsProvider).modelsFor(newValue).first;
+      _modelsStatus = null;
     });
+    if (_apiKeyController.text.trim().isNotEmpty || newValue == 'Custom') _loadModels(quiet: true);
   }
 
   SettingsState _formState() => ref.read(settingsProvider).copyWith(
@@ -162,13 +208,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> with SingleTick
         title: const Text('Settings'),
         bottom: TabBar(
           controller: _tabController,
-          isScrollable: true,
-          tabAlignment: TabAlignment.center,
           indicatorColor: Theme.of(context).colorScheme.secondary,
           tabs: const [
             Tab(icon: Icon(Icons.palette), text: 'Style'),
-            Tab(icon: Icon(Icons.smart_toy), text: 'AI Config'),
-            Tab(icon: Icon(Icons.cloud_sync), text: 'Cloud Sync'),
+            Tab(icon: Icon(Icons.smart_toy), text: 'AI'),
+            Tab(icon: Icon(Icons.cloud_sync), text: 'Sync'),
             Tab(icon: Icon(Icons.info), text: 'About'),
           ],
         ),
@@ -190,6 +234,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> with SingleTick
         _sectionTitle('Chart Style'),
         const SizedBox(height: 16),
         DropdownButtonFormField<String>(
+          isExpanded: true,
           key: ValueKey('style$_selectedStyle'),
           initialValue: _selectedStyle,
           items: ['North', 'South', 'East'].map((e) => DropdownMenuItem(value: e, child: Text('$e Indian Chart'))).toList(),
@@ -199,6 +244,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> with SingleTick
         _sectionTitle('Colour Theme'),
         const SizedBox(height: 16),
         DropdownButtonFormField<String>(
+          isExpanded: true,
           key: ValueKey('theme$_selectedTheme'),
           initialValue: _selectedTheme,
           items: ['Cosmic', 'Dark', 'Light'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
@@ -218,9 +264,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> with SingleTick
   }
 
   Widget _buildAIConfigTab() {
-    final suggestions = LlmProviders.models[_selectedLLM] ?? const <String>[];
+    final scheme = Theme.of(context).colorScheme;
+    final live = ref.watch(settingsProvider.select((st) => st.modelCache[_selectedLLM]?.length ?? 0));
     return ListView(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
       children: [
         Container(
           padding: const EdgeInsets.all(12),
@@ -233,28 +280,63 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> with SingleTick
         ),
         const SizedBox(height: 16),
         DropdownButtonFormField<String>(
+          isExpanded: true,
           key: ValueKey('llm$_selectedLLM'),
           initialValue: _selectedLLM,
           decoration: const InputDecoration(labelText: 'LLM Provider'),
           items: LlmProviders.endpoints.keys
-              .map((e) => DropdownMenuItem(value: e, child: Text(e == 'Custom' ? 'Custom (OpenAI-compatible, e.g. Ollama)' : e)))
+              .map((e) => DropdownMenuItem(
+                  value: e,
+                  child: Text(e == 'Custom' ? 'Custom (OpenAI-compatible, e.g. Ollama)' : e, overflow: TextOverflow.ellipsis)))
               .toList(),
           onChanged: _onLLMChanged,
         ),
         const SizedBox(height: 16),
         TextField(
-          controller: _modelController,
-          decoration: const InputDecoration(labelText: 'Model', helperText: 'Pick a suggestion or type any model name'),
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          children: suggestions
-              .map((m) => ActionChip(label: Text(m), onPressed: () => setState(() => _modelController.text = m)))
-              .toList(),
+          controller: _apiKeyController,
+          obscureText: _obscureKey,
+          decoration: InputDecoration(
+            labelText: _selectedLLM == 'Custom' ? 'API Key (optional)' : 'API Key',
+            helperText: 'Stored encrypted on this device only',
+            prefixIcon: const Icon(Icons.security),
+            suffixIcon: IconButton(
+              icon: Icon(_obscureKey ? Icons.visibility : Icons.visibility_off),
+              onPressed: () => setState(() => _obscureKey = !_obscureKey),
+            ),
+          ),
         ),
         const SizedBox(height: 16),
+        TextField(
+          controller: _modelController,
+          decoration: InputDecoration(
+            labelText: 'Model',
+            helperText: live > 0 ? '$live models available • tap the list icon to choose' : 'Tap the list icon to choose, or type any model id',
+            helperMaxLines: 2,
+            suffixIcon: IconButton(
+              tooltip: 'Choose model',
+              icon: const Icon(Icons.format_list_bulleted),
+              onPressed: _pickModel,
+            ),
+          ),
+        ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: _loadingModels ? null : () => _loadModels(),
+            icon: _loadingModels
+                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.refresh, size: 18),
+            label: const Text('Load latest models from provider'),
+          ),
+        ),
+        if (_modelsStatus != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(_modelsStatus!, style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
+          ),
+        const SizedBox(height: 8),
         DropdownButtonFormField<String>(
+          isExpanded: true,
           key: ValueKey('lang$_selectedLanguage'),
           initialValue: _selectedLanguage,
           decoration: const InputDecoration(labelText: 'Interpreter Language'),
@@ -264,37 +346,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> with SingleTick
         const SizedBox(height: 16),
         TextField(
           controller: _endpointController,
+          keyboardType: TextInputType.url,
           decoration: const InputDecoration(labelText: 'API Endpoint'),
         ),
-        const SizedBox(height: 16),
-        TextField(
-          controller: _apiKeyController,
-          obscureText: _obscureKey,
-          decoration: InputDecoration(
-            labelText: _selectedLLM == 'Custom' ? 'API Key (optional)' : 'API Key (stored encrypted)',
-            prefixIcon: const Icon(Icons.security),
-            suffixIcon: IconButton(
-              icon: Icon(_obscureKey ? Icons.visibility : Icons.visibility_off),
-              onPressed: () => setState(() => _obscureKey = !_obscureKey),
-            ),
-          ),
+        const SizedBox(height: 24),
+        ElevatedButton(onPressed: _saveAiConfig, child: const Text('Save')),
+        const SizedBox(height: 12),
+        OutlinedButton(
+          onPressed: _isTesting ? null : _testConnection,
+          child: _isTesting
+              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Text('Test Connection'),
         ),
         const SizedBox(height: 32),
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton(
-                onPressed: _isTesting ? null : _testConnection,
-                child: _isTesting
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Text('Test Connection'),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(child: ElevatedButton(onPressed: _saveAiConfig, child: const Text('Save'))),
-          ],
-        ),
-        const SizedBox(height: 48),
         _buildApiGuide(),
       ],
     );
@@ -551,9 +615,10 @@ class _CloudSyncTabState extends ConsumerState<_CloudSyncTab> {
             Text(sync.error!, style: TextStyle(color: scheme.error)),
           ],
           const SizedBox(height: 24),
-          Row(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(
+              SizedBox(
                 child: ElevatedButton(
                   onPressed: sync.busy ? null : () => _auth(false),
                   child: sync.busy
@@ -561,8 +626,8 @@ class _CloudSyncTabState extends ConsumerState<_CloudSyncTab> {
                       : const Text('Sign In'),
                 ),
               ),
-              const SizedBox(width: 16),
-              Expanded(
+              const SizedBox(height: 12),
+              SizedBox(
                 child: OutlinedButton(
                   onPressed: sync.busy ? null : () => _auth(true),
                   child: const Text('Create Account'),
@@ -572,6 +637,84 @@ class _CloudSyncTabState extends ConsumerState<_CloudSyncTab> {
           ),
         ],
       ],
+    );
+  }
+}
+
+/// Searchable list of the provider's models.
+class _ModelPickerSheet extends StatefulWidget {
+  final String provider;
+  final List<String> models;
+  final String current;
+  final bool live;
+
+  const _ModelPickerSheet({required this.provider, required this.models, required this.current, required this.live});
+
+  @override
+  State<_ModelPickerSheet> createState() => _ModelPickerSheetState();
+}
+
+class _ModelPickerSheetState extends State<_ModelPickerSheet> {
+  String _query = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final q = _query.toLowerCase();
+    final filtered = widget.models.where((m) => m.toLowerCase().contains(q)).toList();
+    final custom = _query.trim();
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: SizedBox(
+          height: MediaQuery.of(context).size.height * 0.7,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text('${widget.provider} models', style: Theme.of(context).textTheme.titleMedium),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                child: Text(
+                  widget.live
+                      ? 'Loaded from your ${widget.provider} account, newest first.'
+                      : 'Suggested models. Use "Load latest models from provider" to see every model on your account.',
+                  style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: TextField(
+                  autofocus: false,
+                  decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Search or type a model id'),
+                  onChanged: (v) => setState(() => _query = v),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: ListView(
+                  children: [
+                    if (custom.isNotEmpty && !widget.models.contains(custom))
+                      ListTile(
+                        leading: const Icon(Icons.edit),
+                        title: Text('Use "$custom"', overflow: TextOverflow.ellipsis),
+                        onTap: () => Navigator.pop(context, custom),
+                      ),
+                    for (final m in filtered)
+                      ListTile(
+                        title: Text(m, overflow: TextOverflow.ellipsis),
+                        trailing: m == widget.current ? Icon(Icons.check, color: scheme.primary) : null,
+                        onTap: () => Navigator.pop(context, m),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

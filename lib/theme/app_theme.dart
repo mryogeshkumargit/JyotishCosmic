@@ -91,7 +91,7 @@ class AppTheme {
         iconTheme: IconThemeData(color: colorScheme.primary),
         titleTextStyle: GoogleFonts.cinzel(
           color: colorScheme.primary,
-          fontSize: 24,
+          fontSize: 20,
           fontWeight: FontWeight.bold,
         ),
       ),

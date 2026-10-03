@@ -47,6 +47,7 @@ flutter:
     - assets/cities.tsv.gz
     - assets/google_fonts/
     - assets/fonts/
+    - assets/docs/
 
 flutter_launcher_icons:
   android: true

@@ -9,6 +9,7 @@ import 'kundali_milan_screen.dart';
 import 'rashifal_screen.dart';
 import 'report_screen.dart';
 import 'tabs/interpretation_screen.dart';
+import '../widgets/yoga_guide_view.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -142,6 +143,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 backgroundColor: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.2),
                 backgroundImage: const AssetImage('assets/app_icon.png'),
               ),
+              const SizedBox(width: 8),
               Consumer(builder: (context, ref, _) {
                 final synced = ref.watch(syncProvider.select((s) => s.signedIn));
                 return Chip(
@@ -177,8 +179,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   Widget _buildQuickChips() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      child: Wrap(
+        alignment: WrapAlignment.center,
+        spacing: 8,
+        runSpacing: 8,
         children: [
           _buildChip('New Kundali', Icons.add_circle_outline, () {
             Navigator.push(context, MaterialPageRoute(builder: (_) => const KundaliScreen(initialTab: 1)));
@@ -188,6 +192,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           }),
           _buildChip('Report', Icons.picture_as_pdf_outlined, () {
             Navigator.push(context, MaterialPageRoute(builder: (_) => const ReportScreen()));
+          }),
+          _buildChip('Yoga Guide', Icons.auto_stories_outlined, () {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const YogaGuideScreen()));
           }),
         ],
       ),
@@ -206,6 +213,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           border: Border.all(color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.3)),
         ),
         child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon, color: Theme.of(context).colorScheme.secondary, size: 18),
             const SizedBox(width: 8),
@@ -269,6 +277,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             const SizedBox(height: 16),
             Text(
               title,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: Theme.of(context).colorScheme.onSurface,
                 fontSize: 16,

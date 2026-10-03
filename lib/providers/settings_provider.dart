@@ -5,8 +5,9 @@ final settingsProvider = NotifierProvider<SettingsNotifier, SettingsState>(() {
   return SettingsNotifier();
 });
 
-/// Known LLM providers: default endpoint and suggested models (the model
-/// field is free text, so any model the provider offers can be used).
+/// Known LLM providers: default endpoint and suggested models. The Settings
+/// screen also loads the live model list from the provider (`/models`), and
+/// the model field accepts any id, so new models work without an app update.
 class LlmProviders {
   static const Map<String, String> endpoints = {
     'OpenAI': 'https://api.openai.com/v1/chat/completions',
@@ -19,12 +20,20 @@ class LlmProviders {
   };
 
   static const Map<String, List<String>> models = {
-    'OpenAI': ['gpt-5', 'gpt-5-mini'],
-    'Anthropic': ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-4-5'],
-    'Gemini': ['gemini-2.5-pro', 'gemini-2.5-flash'],
-    'DeepSeek': ['deepseek-chat', 'deepseek-reasoner'],
-    'Grok': ['grok-4'],
+    'OpenAI': ['gpt-6-astra', 'gpt-6.1-sol', 'gpt-6-sol', 'gpt-6-luna'],
+    'Anthropic': ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-fable-5-1', 'claude-haiku-4-5'],
+    'Gemini': ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.5-flash', 'gemini-3.1-pro-preview', 'gemini-3.5-flash-lite'],
+    'DeepSeek': ['deepseek-v4-pro', 'deepseek-v4-flash'],
+    'Grok': ['grok-4.7', 'grok-4.6', 'grok-4.5'],
     'Custom': ['llama3.1', 'qwen2.5'],
+  };
+
+  /// Model ids that providers have retired; saved settings using them are
+  /// moved to the provider's current default.
+  static const Map<String, Set<String>> retired = {
+    'Gemini': {'gemini-pro', 'gemini-1.0-pro', 'gemini-1.5-pro', 'gemini-1.5-flash'},
+    // Compatibility aliases discontinued by DeepSeek on 24 July 2026.
+    'DeepSeek': {'deepseek-chat', 'deepseek-reasoner'},
   };
 }
 
@@ -40,6 +49,9 @@ class SettingsState {
   final String apiKey;
   final String modelName;
 
+  /// Models last loaded from each provider's `/models` endpoint.
+  final Map<String, List<String>> modelCache;
+
   SettingsState({
     this.chartStyle = 'North',
     this.themeMode = 'Cosmic',
@@ -47,8 +59,16 @@ class SettingsState {
     this.aiLanguage = 'English',
     this.apiEndpoint = 'https://api.openai.com/v1/chat/completions',
     this.apiKey = '',
-    this.modelName = 'gpt-5',
+    this.modelName = 'gpt-6.1-sol',
+    this.modelCache = const {},
   });
+
+  /// Models to offer for [provider]: the live list if loaded, else suggestions.
+  List<String> modelsFor(String provider) {
+    final live = modelCache[provider];
+    if (live != null && live.isNotEmpty) return live;
+    return LlmProviders.models[provider] ?? const [];
+  }
 
   SettingsState copyWith({
     String? chartStyle,
@@ -58,6 +78,7 @@ class SettingsState {
     String? apiEndpoint,
     String? apiKey,
     String? modelName,
+    Map<String, List<String>>? modelCache,
   }) {
     return SettingsState(
       chartStyle: chartStyle ?? this.chartStyle,
@@ -67,6 +88,7 @@ class SettingsState {
       apiEndpoint: apiEndpoint ?? this.apiEndpoint,
       apiKey: apiKey ?? this.apiKey,
       modelName: modelName ?? this.modelName,
+      modelCache: modelCache ?? this.modelCache,
     );
   }
 }
@@ -93,14 +115,23 @@ class SettingsNotifier extends Notifier<SettingsState> {
       if (provider == 'Gemini' && endpoint != null && !endpoint.contains('/openai/')) {
         endpoint = LlmProviders.endpoints['Gemini'];
       }
+      String? model = values['modelName'];
+      if (provider != null && model != null && (LlmProviders.retired[provider]?.contains(model) ?? false)) {
+        model = LlmProviders.models[provider]!.first;
+      }
+      final cache = <String, List<String>>{
+        for (final e in values.entries)
+          if (e.key.startsWith('models_') && e.value.isNotEmpty) e.key.substring(7): e.value.split('\n'),
+      };
       state = state.copyWith(
+        modelCache: cache,
         chartStyle: values['chartStyle'],
         themeMode: values['themeMode'],
         llmProvider: provider,
         aiLanguage: values['aiLanguage'],
         apiEndpoint: endpoint,
         apiKey: values['apiKey'],
-        modelName: values['modelName'],
+        modelName: model,
       );
     } catch (_) {
       // Keep defaults if secure storage is unavailable.
@@ -126,5 +157,13 @@ class SettingsNotifier extends Notifier<SettingsState> {
     await _storage.write(key: 'apiEndpoint', value: endpoint);
     await _storage.write(key: 'apiKey', value: key);
     await _storage.write(key: 'modelName', value: model);
+  }
+
+  /// Remembers the live model list of [provider] (shown in the model picker).
+  Future<void> cacheModels(String provider, List<String> models) async {
+    state = state.copyWith(modelCache: {...state.modelCache, provider: models});
+    try {
+      await _storage.write(key: 'models_$provider', value: models.join('\n'));
+    } catch (_) {}
   }
 }

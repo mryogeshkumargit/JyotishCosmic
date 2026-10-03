@@ -139,7 +139,7 @@ void main() {
     await settle(tester);
     await tester.tap(find.text('Settings'));
     await settle(tester);
-    await tester.tap(find.text('Cloud Sync'));
+    await tester.tap(find.text('Sync'));
     await settle(tester);
     expect(find.text('Create Account'), findsOneWidget);
     expect(tester.takeException(), isNull);

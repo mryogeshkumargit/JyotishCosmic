@@ -211,6 +211,7 @@ class _NewKundaliTabState extends ConsumerState<_NewKundaliTab> {
 
     if (!mounted) return;
     final tabController = DefaultTabController.of(context);
+    final gender = _gender;
     if (profileId != null) {
       setState(_clear);
       tabController.animateTo(0);
@@ -226,6 +227,7 @@ class _NewKundaliTabState extends ConsumerState<_NewKundaliTab> {
           lon: lon!,
           timezone: tz!,
           tzName: _tzName,
+          gender: gender,
           profileId: profileId,
         ),
       ),
@@ -248,9 +250,11 @@ class _NewKundaliTabState extends ConsumerState<_NewKundaliTab> {
         children: [
           if (isEditing) ...[
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Editing Profile', style: TextStyle(color: scheme.secondary, fontSize: 18, fontWeight: FontWeight.bold)),
+                Expanded(
+                  child: Text('Editing Profile',
+                      style: TextStyle(color: scheme.secondary, fontSize: 18, fontWeight: FontWeight.bold)),
+                ),
                 TextButton(
                   onPressed: () {
                     ref.read(editProfileProvider.notifier).setProfile(null);
@@ -333,6 +337,7 @@ class _NewKundaliTabState extends ConsumerState<_NewKundaliTab> {
             decoration: InputDecoration(
               labelText: 'UTC Offset at birth (hours)',
               hintText: 'e.g. 5.5 for IST',
+              helperMaxLines: 3,
               helperText: _tzName != null && !_tzEditedManually
                   ? 'Calculated from $_tzName (includes daylight saving)'
                   : 'Enter the offset in force at the time of birth',

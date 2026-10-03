@@ -34,7 +34,7 @@ class _BarshphalScreenState extends State<BarshphalScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Barshphal (Varshaphala)')),
+      appBar: AppBar(title: const Text('Varshaphal')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(

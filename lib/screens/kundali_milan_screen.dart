@@ -206,21 +206,22 @@ class _KundaliMilanScreenState extends ConsumerState<KundaliMilanScreen> {
     final Color barColor = score == 0 ? Colors.redAccent : (score == max ? Colors.green : Colors.orange);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6.0),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(flex: 3, child: Text(label, style: const TextStyle(fontSize: 14))),
-          Expanded(
-            flex: 3,
-            child: LinearProgressIndicator(
-              value: score / max,
-              color: barColor,
-              minHeight: 8,
-              borderRadius: BorderRadius.circular(4),
-            ),
+          Row(
+            children: [
+              Expanded(child: Text(label, style: const TextStyle(fontSize: 14))),
+              const SizedBox(width: 8),
+              Text('${fmt(score)} / ${fmt(max)}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+            ],
           ),
-          SizedBox(
-            width: 56,
-            child: Text('${fmt(score)} / ${fmt(max)}', textAlign: TextAlign.right, style: const TextStyle(fontSize: 14)),
+          const SizedBox(height: 4),
+          LinearProgressIndicator(
+            value: score / max,
+            color: barColor,
+            minHeight: 8,
+            borderRadius: BorderRadius.circular(4),
           ),
         ],
       ),

@@ -45,7 +45,7 @@ class GrahaScreen extends ConsumerWidget {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Planetary Positions')),
+      appBar: AppBar(title: const Text('Planets')),
       body: ListView.builder(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
         itemCount: planetDetails.length,
@@ -70,6 +70,7 @@ class GrahaScreen extends ConsumerWidget {
                         child: Text('${pd['name']} (${pd['hindi']})${pd['retro'] ? '  ℞' : ''}',
                             style: TextStyle(color: scheme.secondary, fontSize: 18, fontWeight: FontWeight.bold)),
                       ),
+                      const SizedBox(width: 8),
                       Text('${pd['rashi']} ${pd['degree']}', style: TextStyle(color: scheme.onSurface, fontSize: 15)),
                     ],
                   ),

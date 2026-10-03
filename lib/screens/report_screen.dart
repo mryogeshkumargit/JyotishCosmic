@@ -37,7 +37,9 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
         '${ChartSummary.describe(profile.computeChart(), name: profile.name)}';
 
     try {
-      final response = await AiService.interpret(ref.read(settingsProvider), prompt);
+      final response = await AiService.interpret(ref.read(settingsProvider), prompt, onPartial: (partial) {
+        if (mounted) setState(() => _resultText = partial);
+      });
       if (mounted) setState(() => _resultText = response);
     } catch (e) {
       if (mounted) setState(() => _error = '$e');
@@ -76,7 +78,7 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
           appBar: AppBar(
             title: const Text('Premium Report'),
             actions: [
-              if (_resultText != null && active != null)
+              if (_resultText != null && !_isLoading && active != null)
                 IconButton(
                   icon: _exporting
                       ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
@@ -92,6 +94,7 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
                   padding: const EdgeInsets.all(16),
                   children: [
                     DropdownButtonFormField<int>(
+                      isExpanded: true,
                       decoration: const InputDecoration(labelText: 'Profile'),
                       initialValue: active.id,
                       items: profiles.map((p) => DropdownMenuItem(value: p.id, child: Text(p.name))).toList(),
@@ -122,7 +125,16 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
                         Text(_error!, style: TextStyle(color: scheme.error), textAlign: TextAlign.center),
                       ],
                     ],
-                    if (_isLoading) const Padding(padding: EdgeInsets.all(48), child: Center(child: CircularProgressIndicator())),
+                    if (_isLoading && _resultText == null)
+                      const Padding(
+                        padding: EdgeInsets.all(48),
+                        child: Column(children: [
+                          CircularProgressIndicator(),
+                          SizedBox(height: 16),
+                          Text('Writing your report… long reports can take a few minutes.', textAlign: TextAlign.center),
+                        ]),
+                      ),
+                    if (_isLoading && _resultText != null) const LinearProgressIndicator(minHeight: 2),
                     if (_resultText != null)
                       Container(
                         padding: const EdgeInsets.all(16),
@@ -133,6 +145,20 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
                         ),
                         child: AiMarkdown(_resultText!),
                       ),
+                    if (_resultText != null && _error != null) ...[
+                      const SizedBox(height: 12),
+                      Text(_error!, style: TextStyle(color: scheme.error)),
+                    ],
+                    if (_resultText != null && !_isLoading) ...[
+                      const SizedBox(height: 12),
+                      Center(
+                        child: TextButton.icon(
+                          onPressed: () => _generateFullReport(active!),
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Generate again'),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
         );

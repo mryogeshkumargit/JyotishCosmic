@@ -13,7 +13,12 @@ class InterpretationScreen extends ConsumerWidget {
     if (profileId == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('AI Interpretation')),
-        body: const Center(child: Text('This Kundali is not saved yet. Please save it to view AI interpretations.')),
+        body: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text('This Kundali is not saved yet. Please save it to view AI interpretations.', textAlign: TextAlign.center),
+          ),
+        ),
       );
     }
 
@@ -29,7 +34,7 @@ class InterpretationScreen extends ConsumerWidget {
         final text = profile.aiInterpretation;
         
         return Scaffold(
-          appBar: AppBar(title: Text('Interpretations for ${profile.name}', style: const TextStyle(fontSize: 18))),
+          appBar: AppBar(title: const Text('Interpretations')),
           body: () {
             if (text == null || text.isEmpty) {
             return Center(

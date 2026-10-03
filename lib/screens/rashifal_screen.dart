@@ -48,7 +48,9 @@ class _RashifalScreenState extends ConsumerState<RashifalScreen> {
           '${transits.map((t) => '- ${t.planetData.name} in ${t.rashiData.name}${t.retrograde ? ' (retrograde)' : ''}, house ${t.houseFromMoon} from Moon').join('\n')}\n\n'
           'Natal chart:\n${ChartSummary.describe(chartData, name: profile.name)}';
 
-      final response = await AiService.interpret(ref.read(settingsProvider), prompt);
+      final response = await AiService.interpret(ref.read(settingsProvider), prompt, onPartial: (partial) {
+        if (mounted) setState(() => _resultText = partial);
+      });
       if (mounted) setState(() => _resultText = response);
     } catch (e) {
       if (mounted) setState(() => _error = '$e');
@@ -63,7 +65,7 @@ class _RashifalScreenState extends ConsumerState<RashifalScreen> {
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Rashifal (Horoscope)')),
+      appBar: AppBar(title: const Text('Rashifal')),
       body: profilesAsync.when(
         data: (profiles) {
           if (profiles.isEmpty) {
@@ -101,37 +103,58 @@ class _RashifalScreenState extends ConsumerState<RashifalScreen> {
                   '(${VedicMath.rashis[VedicMath.rashiIndex(moonSid)].hindi})',
                   style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Row(
                 children: [
                   for (final tab in ['Daily', 'Weekly', 'Monthly'])
-                    ElevatedButton(
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: ElevatedButton(
                       onPressed: _isLoading ? null : () => _fetchRashifal(tab, profile),
                       style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
                         backgroundColor: _activeTab == tab ? scheme.primary : scheme.surfaceContainerHighest,
                         foregroundColor: _activeTab == tab ? scheme.onPrimary : scheme.onSurface,
                       ),
-                      child: Text(tab),
+                      child: FittedBox(fit: BoxFit.scaleDown, child: Text(tab)),
+                    ),
+                      ),
                     ),
                 ],
               ),
+              ),
               const SizedBox(height: 16),
               Expanded(
-                child: _isLoading
+                child: _isLoading && _resultText == null
                     ? Center(child: CircularProgressIndicator(color: scheme.primary))
-                    : _error != null
-                        ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!, style: TextStyle(color: scheme.error))))
+                    : _error != null && _resultText == null
+                        ? SingleChildScrollView(
+                            padding: const EdgeInsets.all(24),
+                            child: Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: scheme.error)))
                         : _resultText != null
                             ? SingleChildScrollView(
                                 padding: const EdgeInsets.all(16),
-                                child: Container(
-                                  padding: const EdgeInsets.all(16),
-                                  decoration: BoxDecoration(
-                                    color: scheme.surfaceContainerHighest,
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(color: scheme.outline),
-                                  ),
-                                  child: AiMarkdown(_resultText!),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    if (_isLoading) LinearProgressIndicator(color: scheme.primary, minHeight: 2),
+                                    Container(
+                                      padding: const EdgeInsets.all(16),
+                                      decoration: BoxDecoration(
+                                        color: scheme.surfaceContainerHighest,
+                                        borderRadius: BorderRadius.circular(16),
+                                        border: Border.all(color: scheme.outline),
+                                      ),
+                                      child: AiMarkdown(_resultText!),
+                                    ),
+                                    if (_error != null)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 12),
+                                        child: Text(_error!, style: TextStyle(color: scheme.error)),
+                                      ),
+                                  ],
                                 ),
                               )
                             : Center(

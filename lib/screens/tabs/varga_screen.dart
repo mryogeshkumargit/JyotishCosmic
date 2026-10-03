@@ -34,7 +34,7 @@ class VargaScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Shodashvarga (Vargas)')),
+      appBar: AppBar(title: const Text('Shodashvarga')),
       body: ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: VedicMath.vargaDefs.length,

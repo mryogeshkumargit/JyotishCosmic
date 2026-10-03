@@ -31,6 +31,7 @@ class _AiChatViewState extends ConsumerState<AiChatView> {
   final List<ChatMessage> _history = [];
   final List<(bool isUser, String text, bool isError)> _display = [];
   bool _isLoading = false;
+  String _streaming = '';
 
   @override
   void dispose() {
@@ -65,9 +66,15 @@ class _AiChatViewState extends ConsumerState<AiChatView> {
     _scrollToEnd();
 
     try {
-      final response = await AiService.chat(ref.read(settingsProvider), List.of(_history));
+      final response = await AiService.chat(ref.read(settingsProvider), List.of(_history), onPartial: (partial) {
+        if (!mounted) return;
+        final first = _streaming.isEmpty;
+        setState(() => _streaming = partial);
+        if (first) _scrollToEnd();
+      });
       if (!mounted) return;
       setState(() {
+        _streaming = '';
         _history.add(ChatMessage.assistant(response));
         _display.add((false, response, false));
       });
@@ -75,7 +82,11 @@ class _AiChatViewState extends ConsumerState<AiChatView> {
       if (!mounted) return;
       // Drop the unanswered question from the history so the next turn stays valid.
       _history.removeLast();
-      setState(() => _display.add((false, '$e', true)));
+      setState(() {
+        if (_streaming.isNotEmpty) _display.add((false, _streaming, false));
+        _streaming = '';
+        _display.add((false, '$e', true));
+      });
     } finally {
       if (mounted) setState(() => _isLoading = false);
       _scrollToEnd();
@@ -95,7 +106,7 @@ class _AiChatViewState extends ConsumerState<AiChatView> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final items = [(false, widget.greeting, false), ..._display];
+    final items = [(false, widget.greeting, false), ..._display, if (_streaming.isNotEmpty) (false, _streaming, false)];
     return Column(
       children: [
         Expanded(
@@ -125,7 +136,7 @@ class _AiChatViewState extends ConsumerState<AiChatView> {
                         Text(text, style: TextStyle(color: scheme.error))
                       else
                         AiMarkdown(text),
-                      if (!isUser && !isError && index > 0 && widget.profileId != null)
+                      if (!isUser && !isError && index > 0 && widget.profileId != null && !(_isLoading && index == items.length - 1))
                         TextButton.icon(
                           onPressed: () => _save(text),
                           icon: const Icon(Icons.save, size: 16),
@@ -138,11 +149,7 @@ class _AiChatViewState extends ConsumerState<AiChatView> {
             },
           ),
         ),
-        if (_isLoading)
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: CircularProgressIndicator(color: scheme.secondary),
-          ),
+        if (_isLoading) LinearProgressIndicator(color: scheme.secondary, minHeight: 2),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           color: scheme.surfaceContainerHighest,

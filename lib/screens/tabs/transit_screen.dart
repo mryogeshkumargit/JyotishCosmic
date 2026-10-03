@@ -34,7 +34,7 @@ class _TransitScreenState extends ConsumerState<TransitScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Current Transits (Gochar)')),
+      appBar: AppBar(title: const Text('Transits (Gochar)')),
       body: ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: transits.length + 1,

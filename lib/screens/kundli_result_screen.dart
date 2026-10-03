@@ -34,6 +34,7 @@ class KundliResultScreen extends ConsumerStatefulWidget {
   final double timezone;
   final String? tzName;
   final String? place;
+  final String? gender;
   final int? profileId;
 
   const KundliResultScreen({
@@ -45,6 +46,7 @@ class KundliResultScreen extends ConsumerStatefulWidget {
     required this.timezone,
     this.tzName,
     this.place,
+    this.gender,
     this.profileId,
   });
 
@@ -56,6 +58,7 @@ class KundliResultScreen extends ConsumerStatefulWidget {
         timezone: p.timezone,
         tzName: p.tzName,
         place: p.pob,
+        gender: p.gender,
         profileId: p.id,
       );
 
@@ -124,7 +127,7 @@ class _KundliResultScreenState extends ConsumerState<KundliResultScreen> {
       case 'Dosha':
         _open(DoshasScreen(chartData: c));
       case 'Yogas':
-        _open(YogasScreen(chartData: c));
+        _open(YogasScreen(chartData: c, gender: widget.gender, profileId: id, name: widget.name));
       case 'Shodashvarga':
         _open(VargaScreen(chartData: c, profileId: id));
       case 'Transit':
@@ -157,7 +160,7 @@ class _KundliResultScreenState extends ConsumerState<KundliResultScreen> {
     final moon = _chartData.planetLongitudes['moon']!;
     return Scaffold(
       appBar: AppBar(
-        title: Text('${widget.name}\'s Horoscope'),
+        title: const Text('Horoscope'),
         actions: [
           IconButton(
             icon: const Icon(Icons.picture_as_pdf),

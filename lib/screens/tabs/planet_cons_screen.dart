@@ -23,7 +23,7 @@ class _PlanetConsScreenState extends State<PlanetConsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Planetary Avasthas')),
+      appBar: AppBar(title: const Text('Avasthas')),
       body: ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: avasthas.length,

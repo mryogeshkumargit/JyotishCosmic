@@ -1,6 +1,7 @@
 import 'ephemeris.dart';
 import 'planetary_dignity.dart';
 import 'vedic_math.dart';
+import 'yogas_math.dart';
 
 /// Human-readable chart description used as context for AI prompts.
 class ChartSummary {
@@ -36,6 +37,10 @@ class ChartSummary {
         buf.writeln('Current Vimshottari dasha (Maha / Antar / Pratyantar): $names '
             '(Mahadasha ${running.first.startDate} to ${running.first.endDate})');
       }
+    }
+    final yogas = YogasMath.forChart(chart).where((y) => y.formed && y.strength != 'Secondary').toList();
+    if (yogas.isNotEmpty) {
+      buf.writeln('Classical yogas (calculated): ${yogas.map((y) => '${y.name} (${y.strength}${y.active ? ', active in current dasha' : ''})').join('; ')}');
     }
     return buf.toString().trim();
   }

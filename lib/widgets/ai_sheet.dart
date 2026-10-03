@@ -52,13 +52,35 @@ class _AiSheet extends ConsumerStatefulWidget {
 }
 
 class _AiSheetState extends ConsumerState<_AiSheet> {
-  late Future<String> _future;
+  String _text = '';
+  String? _error;
+  bool _done = false;
   bool _saved = false;
+  int _run = 0;
 
   @override
   void initState() {
     super.initState();
-    _future = AiService.interpret(ref.read(settingsProvider), widget.prompt);
+    _start();
+  }
+
+  Future<void> _start() async {
+    final run = ++_run;
+    setState(() {
+      _text = '';
+      _error = null;
+      _done = false;
+    });
+    try {
+      final text = await AiService.interpret(ref.read(settingsProvider), widget.prompt, onPartial: (partial) {
+        if (mounted && run == _run) setState(() => _text = partial);
+      });
+      if (mounted && run == _run) setState(() => _text = text);
+    } catch (e) {
+      if (mounted && run == _run) setState(() => _error = '$e');
+    } finally {
+      if (mounted && run == _run) setState(() => _done = true);
+    }
   }
 
   Future<void> _save(String text) async {
@@ -76,8 +98,8 @@ class _AiSheetState extends ConsumerState<_AiSheet> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.all(24),
-      height: MediaQuery.of(context).size.height * 0.75,
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      height: MediaQuery.of(context).size.height * 0.85,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -92,51 +114,61 @@ class _AiSheetState extends ConsumerState<_AiSheet> {
               IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
             ],
           ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: FutureBuilder<String>(
-              future: _future,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState != ConnectionState.done) {
-                  return Center(child: CircularProgressIndicator(color: scheme.secondary));
-                }
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text('${snapshot.error}', style: TextStyle(color: scheme.error), textAlign: TextAlign.center),
-                        const SizedBox(height: 12),
-                        OutlinedButton(
-                          onPressed: () => setState(() {
-                            _future = AiService.interpret(ref.read(settingsProvider), widget.prompt);
-                          }),
-                          child: const Text('Retry'),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-                final text = snapshot.data ?? '';
-                return SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      AiMarkdown(text),
-                      if (widget.profileId != null) ...[
-                        const SizedBox(height: 20),
-                        ElevatedButton.icon(
-                          onPressed: _saved ? null : () => _save(text),
-                          icon: Icon(_saved ? Icons.check : Icons.save),
-                          label: Text(_saved ? 'Saved' : 'Save Interpretation to Profile'),
-                        ),
-                      ],
-                    ],
-                  ),
-                );
-              },
+          if (!_done) LinearProgressIndicator(color: scheme.secondary, minHeight: 2),
+          const SizedBox(height: 12),
+          Expanded(child: SafeArea(top: false, child: _body(scheme))),
+        ],
+      ),
+    );
+  }
+
+  Widget _body(ColorScheme scheme) {
+    if (_error != null && _text.isEmpty) {
+      return SingleChildScrollView(
+        child: Column(
+          children: [
+            const SizedBox(height: 24),
+            Icon(Icons.error_outline, color: scheme.error, size: 40),
+            const SizedBox(height: 12),
+            Text(_error!, style: TextStyle(color: scheme.error), textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            OutlinedButton(onPressed: _start, child: const Text('Retry')),
+          ],
+        ),
+      );
+    }
+    if (_text.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(color: scheme.secondary),
+            const SizedBox(height: 16),
+            Text('Waiting for the AI… reasoning models can take a minute before they start writing.',
+                textAlign: TextAlign.center, style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13)),
+          ],
+        ),
+      );
+    }
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AiMarkdown(_text),
+          if (_error != null) ...[
+            const SizedBox(height: 12),
+            Text(_error!, style: TextStyle(color: scheme.error)),
+            TextButton(onPressed: _start, child: const Text('Retry')),
+          ],
+          if (_done && _error == null && widget.profileId != null) ...[
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: _saved ? null : () => _save(_text),
+              icon: Icon(_saved ? Icons.check : Icons.save),
+              label: Text(_saved ? 'Saved' : 'Save Interpretation to Profile'),
             ),
-          ),
+          ],
+          const SizedBox(height: 24),
         ],
       ),
     );

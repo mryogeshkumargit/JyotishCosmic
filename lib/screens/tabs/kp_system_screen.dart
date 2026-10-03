@@ -38,11 +38,11 @@ class _KPSystemScreenState extends State<KPSystemScreen> {
             const SizedBox(height: 12),
             const Text('Planetary Details', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            _buildPlanetTable(),
+            DefaultTextStyle.merge(style: const TextStyle(fontSize: 13), child: _buildPlanetTable()),
             const SizedBox(height: 24),
             const Text('Placidus House Cusps', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            _buildCuspTable(),
+            DefaultTextStyle.merge(style: const TextStyle(fontSize: 13), child: _buildCuspTable()),
             const SizedBox(height: 24),
             const Text('KP Interpretations (Sub-Lords)', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
@@ -53,12 +53,15 @@ class _KPSystemScreenState extends State<KPSystemScreen> {
     );
   }
 
+  static String _short(String rashi) => rashi.length > 3 ? rashi.substring(0, 3) : rashi;
+
   Widget _buildPlanetTable() {
     return Table(
+      defaultVerticalAlignment: TableCellVerticalAlignment.middle,
       border: TableBorder.all(color: Colors.grey.withValues(alpha: 0.3)),
       columnWidths: const {
-        0: FlexColumnWidth(2),
-        1: FlexColumnWidth(2),
+        0: FlexColumnWidth(2.2),
+        1: FlexColumnWidth(2.4),
         2: FlexColumnWidth(2),
         3: FlexColumnWidth(2),
       },
@@ -66,20 +69,20 @@ class _KPSystemScreenState extends State<KPSystemScreen> {
         const TableRow(
           decoration: BoxDecoration(color: Colors.black12),
           children: [
-            Padding(padding: EdgeInsets.all(8.0), child: Text('Planet', style: TextStyle(fontWeight: FontWeight.bold))),
-            Padding(padding: EdgeInsets.all(8.0), child: Text('Sign', style: TextStyle(fontWeight: FontWeight.bold))),
-            Padding(padding: EdgeInsets.all(8.0), child: Text('Nak Lord', style: TextStyle(fontWeight: FontWeight.bold))),
-            Padding(padding: EdgeInsets.all(8.0), child: Text('Sub Lord', style: TextStyle(fontWeight: FontWeight.bold))),
+            Padding(padding: EdgeInsets.all(6.0), child: Text('Planet', style: TextStyle(fontWeight: FontWeight.bold))),
+            Padding(padding: EdgeInsets.all(6.0), child: Text('Sign', style: TextStyle(fontWeight: FontWeight.bold))),
+            Padding(padding: EdgeInsets.all(6.0), child: Text('Star Lord', style: TextStyle(fontWeight: FontWeight.bold))),
+            Padding(padding: EdgeInsets.all(6.0), child: Text('Sub Lord', style: TextStyle(fontWeight: FontWeight.bold))),
           ],
         ),
         ...Ephemeris.planetOrder.where(kpPlanets.containsKey).map((p) {
                     var data = kpPlanets[p]!;
           return TableRow(
             children: [
-              Padding(padding: const EdgeInsets.all(8.0), child: Text(VedicMath.planets[p]!.name)),
-              Padding(padding: const EdgeInsets.all(8.0), child: Text('${data.rashi} ${VedicMath.formatDegree(data.longitude)}')),
-              Padding(padding: const EdgeInsets.all(8.0), child: Text(VedicMath.capitalize(data.nakshatraLord))),
-              Padding(padding: const EdgeInsets.all(8.0), child: Text(VedicMath.capitalize(data.subLord))),
+              Padding(padding: const EdgeInsets.all(6.0), child: Text(VedicMath.planets[p]!.name)),
+              Padding(padding: const EdgeInsets.all(6.0), child: Text('${_short(data.rashi)} ${VedicMath.formatDegree(data.longitude)}')),
+              Padding(padding: const EdgeInsets.all(6.0), child: Text(VedicMath.capitalize(data.nakshatraLord))),
+              Padding(padding: const EdgeInsets.all(6.0), child: Text(VedicMath.capitalize(data.subLord))),
             ],
           );
         }),
@@ -89,10 +92,11 @@ class _KPSystemScreenState extends State<KPSystemScreen> {
 
   Widget _buildCuspTable() {
     return Table(
+      defaultVerticalAlignment: TableCellVerticalAlignment.middle,
       border: TableBorder.all(color: Colors.grey.withValues(alpha: 0.3)),
       columnWidths: const {
-        0: FlexColumnWidth(1),
-        1: FlexColumnWidth(2),
+        0: FlexColumnWidth(1.2),
+        1: FlexColumnWidth(2.4),
         2: FlexColumnWidth(2),
         3: FlexColumnWidth(2),
       },
@@ -100,19 +104,19 @@ class _KPSystemScreenState extends State<KPSystemScreen> {
         const TableRow(
           decoration: BoxDecoration(color: Colors.black12),
           children: [
-            Padding(padding: EdgeInsets.all(8.0), child: Text('House', style: TextStyle(fontWeight: FontWeight.bold))),
-            Padding(padding: EdgeInsets.all(8.0), child: Text('Sign', style: TextStyle(fontWeight: FontWeight.bold))),
-            Padding(padding: EdgeInsets.all(8.0), child: Text('Nak Lord', style: TextStyle(fontWeight: FontWeight.bold))),
-            Padding(padding: EdgeInsets.all(8.0), child: Text('Sub Lord', style: TextStyle(fontWeight: FontWeight.bold))),
+            Padding(padding: EdgeInsets.all(6.0), child: Text('#', style: TextStyle(fontWeight: FontWeight.bold))),
+            Padding(padding: EdgeInsets.all(6.0), child: Text('Sign', style: TextStyle(fontWeight: FontWeight.bold))),
+            Padding(padding: EdgeInsets.all(6.0), child: Text('Star Lord', style: TextStyle(fontWeight: FontWeight.bold))),
+            Padding(padding: EdgeInsets.all(6.0), child: Text('Sub Lord', style: TextStyle(fontWeight: FontWeight.bold))),
           ],
         ),
         ...kpCusps.map((c) {
           return TableRow(
             children: [
-              Padding(padding: const EdgeInsets.all(8.0), child: Text(c.cuspNumber.toString())),
-              Padding(padding: const EdgeInsets.all(8.0), child: Text('${c.rashi} ${VedicMath.formatDegree(c.longitude)}')),
-              Padding(padding: const EdgeInsets.all(8.0), child: Text(VedicMath.capitalize(c.nakshatraLord))),
-              Padding(padding: const EdgeInsets.all(8.0), child: Text(VedicMath.capitalize(c.subLord))),
+              Padding(padding: const EdgeInsets.all(6.0), child: Text(c.cuspNumber.toString())),
+              Padding(padding: const EdgeInsets.all(6.0), child: Text('${_short(c.rashi)} ${VedicMath.formatDegree(c.longitude)}')),
+              Padding(padding: const EdgeInsets.all(6.0), child: Text(VedicMath.capitalize(c.nakshatraLord))),
+              Padding(padding: const EdgeInsets.all(6.0), child: Text(VedicMath.capitalize(c.subLord))),
             ],
           );
         }),

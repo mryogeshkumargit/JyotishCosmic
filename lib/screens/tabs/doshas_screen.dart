@@ -54,9 +54,9 @@ class DoshasScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
+                      Expanded(
+                        child: Text(
                         '${dosha.name} (${dosha.hindi})',
                         style: TextStyle(
                           color: dosha.present ? Theme.of(context).colorScheme.error : Theme.of(context).colorScheme.primary,
@@ -64,6 +64,8 @@ class DoshasScreen extends StatelessWidget {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
+                      ),
+                      const SizedBox(width: 8),
                       Chip(
                         label: Text(dosha.present ? 'Present' : 'Absent'),
                         backgroundColor: dosha.present ? Theme.of(context).colorScheme.errorContainer : Theme.of(context).colorScheme.primaryContainer,

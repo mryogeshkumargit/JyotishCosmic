@@ -27,7 +27,7 @@ class _RemediesScreenState extends State<RemediesScreen> {
     final doshas = _remedies.where((r) => r.type == 'dosha').toList();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Astrological Remedies')),
+      appBar: AppBar(title: const Text('Remedies')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
