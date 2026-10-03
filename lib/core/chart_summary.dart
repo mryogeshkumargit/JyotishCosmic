@@ -2,6 +2,7 @@ import 'ephemeris.dart';
 import 'planetary_dignity.dart';
 import 'vedic_math.dart';
 import 'yogas_math.dart';
+import 'shadbala_math.dart';
 
 /// Human-readable chart description used as context for AI prompts.
 class ChartSummary {
@@ -11,7 +12,7 @@ class ChartSummary {
     final house = VedicMath.houseOf(r, chart.lagnaRashi);
     final nak = VedicMath.nakshatras[VedicMath.nakshatraIndex(sid)];
     final rashis = {for (final e in chart.planetLongitudes.entries) e.key: VedicMath.rashiIndex(e.value)};
-    final dignity = PlanetaryDignity.getAdvancedDignity(planet, r, rashis);
+    final dignity = PlanetaryDignity.getAdvancedDignity(planet, r, rashis, degree: VedicMath.degInRashi(sid));
     final retro = chart.isRetrograde(planet) ? ', retrograde' : '';
     return '${VedicMath.planets[planet]!.name}: ${VedicMath.rashis[r].name} ${VedicMath.formatDegree(sid)}, '
         'house $house, ${nak.name} pada ${VedicMath.pada(sid)}, $dignity$retro';
@@ -38,6 +39,10 @@ class ChartSummary {
             '(Mahadasha ${running.first.startDate} to ${running.first.endDate})');
       }
     }
+    try {
+      final sb = ShadbalaMath.compute(chart);
+      buf.writeln('Shadbala (rupas, ratio to BPHS minimum): ${sb.ranked.map((s) => '${s.name} ${s.rupas.toStringAsFixed(2)} (${s.ratio.toStringAsFixed(2)}x)').join(', ')}');
+    } catch (_) {}
     final yogas = YogasMath.forChart(chart).where((y) => y.formed && y.strength != 'Secondary').toList();
     if (yogas.isNotEmpty) {
       buf.writeln('Classical yogas (calculated): ${yogas.map((y) => '${y.name} (${y.strength}${y.active ? ', active in current dasha' : ''})').join('; ')}');

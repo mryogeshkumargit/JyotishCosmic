@@ -39,7 +39,7 @@ class GrahaScreen extends ConsumerWidget {
       final p = VedicMath.planets[key];
       if (sid == null || p == null) continue;
       add(p.name, p.hindi, sid,
-          dignity: PlanetaryDignity.getAdvancedDignity(key, VedicMath.rashiIndex(sid), rashis),
+          dignity: PlanetaryDignity.getAdvancedDignity(key, VedicMath.rashiIndex(sid), rashis, degree: VedicMath.degInRashi(sid)),
           retro: chartData.isRetrograde(key),
           speed: chartData.planetSpeeds[key]);
     }

@@ -90,7 +90,7 @@ class PdfService {
       for (final p in Ephemeris.planetOrder)
         if (chart.planetLongitudes.containsKey(p))
           row(VedicMath.planets[p]!.name, chart.planetLongitudes[p]!,
-              dignity: PlanetaryDignity.getAdvancedDignity(p, rashis[p]!, rashis), retro: chart.isRetrograde(p)),
+              dignity: PlanetaryDignity.getAdvancedDignity(p, rashis[p]!, rashis, degree: VedicMath.degInRashi(chart.planetLongitudes[p]!)), retro: chart.isRetrograde(p)),
     ];
 
     return pw.TableHelper.fromTextArray(

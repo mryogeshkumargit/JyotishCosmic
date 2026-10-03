@@ -89,6 +89,7 @@ void main() {
     const features = [
       'Planet', 'Dasha', 'Predictions', 'KP System', 'Shodashvarga', 'Lal Kitab', 'Barshphal', 'Transit',
       'Nakshatra', 'Avasthas', 'Panchang', 'Dosha', 'Yogas', 'Remedies', 'Interpretation', 'Ask AI',
+      'Synthesis', 'Conjunctions', 'Strength', 'Ashtakavarga',
     ];
     for (final f in features) {
       await tester.tap(find.text(f).first);

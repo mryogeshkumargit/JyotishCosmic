@@ -24,6 +24,18 @@ class ChartData {
   final double lon;
   final double utcOffset;
 
+  /// Ecliptic latitude (degrees, north positive) of each body.
+  final Map<String, double> planetLatitudes;
+
+  /// Tropical declination (degrees, north positive) of each body.
+  final Map<String, double> declinations;
+
+  /// Sidereal heliocentric longitude of the planets (not Sun, Moon or nodes).
+  final Map<String, double> heliocentricLongitudes;
+
+  /// Sidereal Midheaven (10th cusp, MC).
+  final double? midheaven;
+
   ChartData(
     this.housePlanets,
     this.planetLongitudes,
@@ -34,6 +46,10 @@ class ChartData {
     this.lat = 0,
     this.lon = 0,
     this.utcOffset = 0,
+    this.planetLatitudes = const {},
+    this.declinations = const {},
+    this.heliocentricLongitudes = const {},
+    this.midheaven,
   });
 
   /// 0-based sign index of the ascendant (0 = Aries).
@@ -102,6 +118,13 @@ class Ephemeris {
 
   static final SwephFlag _siderealFlags =
       SwephFlag.SEFLG_SWIEPH | SwephFlag.SEFLG_SPEED | SwephFlag.SEFLG_SIDEREAL;
+  static final SwephFlag _equatorialFlags = SwephFlag.SEFLG_SWIEPH | SwephFlag.SEFLG_EQUATORIAL;
+  static final SwephFlag _helioFlags = SwephFlag.SEFLG_SWIEPH | SwephFlag.SEFLG_HELCTR | SwephFlag.SEFLG_SIDEREAL;
+
+  /// Description of the astronomical conventions, for audit logs.
+  static const String ephemerisLabel = 'Swiss Ephemeris (sweph), sepl_18/semo_18 files, Moshier fallback';
+  static const String nodeModel = 'Mean lunar node';
+  static const String ayanamsaLabel = 'Lahiri (Chitrapaksha); Krishnamurti for KP';
 
   static double _norm360(double d) {
     final x = d % 360;
@@ -167,6 +190,40 @@ class Ephemeris {
     return (_norm360(pos.longitude), pos.speedInLongitude);
   }
 
+  /// Ecliptic latitude of a body (degrees). Mean nodes have zero latitude.
+  static double eclipticLatitude(String planet, double jdUt) {
+    final body = _bodies[planet];
+    if (body == null) return 0;
+    return Sweph.swe_calc_ut(jdUt, body, _siderealFlags).latitude;
+  }
+
+  /// Tropical declination of a body (degrees).
+  static double declination(String planet, double jdUt) {
+    if (planet == 'rahu' || planet == 'ketu') {
+      final node = Sweph.swe_calc_ut(jdUt, HeavenlyBody.SE_MEAN_NODE, _equatorialFlags);
+      return planet == 'rahu' ? node.latitude : -node.latitude;
+    }
+    final body = _bodies[planet];
+    if (body == null) return 0;
+    return Sweph.swe_calc_ut(jdUt, body, _equatorialFlags).latitude;
+  }
+
+  /// Sidereal heliocentric longitude of a planet (Mars to Saturn, Mercury, Venus).
+  static double? heliocentricLongitude(String planet, double jdUt, [Ayanamsa mode = Ayanamsa.lahiri]) {
+    if (planet == 'sun' || planet == 'moon' || planet == 'rahu' || planet == 'ketu') return null;
+    final body = _bodies[planet];
+    if (body == null) return null;
+    _setAyanamsa(mode);
+    return _norm360(Sweph.swe_calc_ut(jdUt, body, _helioFlags).longitude);
+  }
+
+  /// Sidereal Midheaven (MC).
+  static double midheavenLongitude(double jdUt, double lat, double lon, [Ayanamsa mode = Ayanamsa.lahiri]) {
+    _setAyanamsa(mode);
+    final houses = Sweph.swe_houses_ex(jdUt, SwephFlag.SEFLG_SIDEREAL, lat, lon, Hsys.E);
+    return _norm360(houses.ascmc[1]);
+  }
+
   static double siderealLongitude(String planet, double jdUt, [Ayanamsa mode = Ayanamsa.lahiri]) =>
       siderealPosition(planet, jdUt, mode).$1;
 
@@ -205,6 +262,12 @@ class Ephemeris {
 
     final ascSid = ascendant(jdUt, lat, lon, mode);
     final lagnaSign = (ascSid / 30).floor();
+    final lats = {for (final n in planetOrder) n: eclipticLatitude(n, jdUt)};
+    final decls = {for (final n in planetOrder) n: declination(n, jdUt)};
+    final helio = <String, double>{
+      for (final n in planetOrder) n: ?heliocentricLongitude(n, jdUt, mode),
+    };
+    final mc = midheavenLongitude(jdUt, lat, lon, mode);
 
     final Map<int, List<String>> housePlanets = {for (int i = 1; i <= 12; i++) i: []};
     longs.forEach((name, longitude) {
@@ -223,6 +286,10 @@ class Ephemeris {
       lat: lat,
       lon: lon,
       utcOffset: utcOffset,
+      planetLatitudes: lats,
+      declinations: decls,
+      heliocentricLongitudes: helio,
+      midheaven: mc,
     );
   }
 
@@ -231,6 +298,9 @@ class Ephemeris {
 
   /// Next sunset (UT Julian day) after [jdUt]; null in polar day/night.
   static double? nextSunset(double jdUt, double lat, double lon) => _riseSet(jdUt, lat, lon, RiseSetTransitFlag.SE_CALC_SET);
+
+  /// Next upper meridian transit of the Sun (local apparent noon) after [jdUt].
+  static double? nextSunTransit(double jdUt, double lat, double lon) => _riseSet(jdUt, lat, lon, RiseSetTransitFlag.SE_CALC_MTRANSIT);
 
   static double? _riseSet(double jdUt, double lat, double lon, RiseSetTransitFlag flag) {
     try {

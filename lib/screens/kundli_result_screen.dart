@@ -23,6 +23,10 @@ import 'tabs/interpretation_screen.dart';
 import 'tabs/ai_chat_screen.dart';
 import 'tabs/remedies_screen.dart';
 import 'tabs/predictions_screen.dart';
+import 'tabs/conjunctions_screen.dart';
+import 'tabs/strength_screen.dart';
+import 'tabs/ashtakavarga_screen.dart';
+import 'tabs/synthesis_screen.dart';
 
 class KundliResultScreen extends ConsumerStatefulWidget {
   final String name;
@@ -70,6 +74,7 @@ class _KundliResultScreenState extends ConsumerState<KundliResultScreen> {
   late final ChartData _chartData;
 
   static const List<(String, IconData)> _actionButtons = [
+    ('Synthesis', Icons.hub),
     ('Planet', Icons.public),
     ('Dasha', Icons.timeline),
     ('Predictions', Icons.auto_awesome),
@@ -83,6 +88,9 @@ class _KundliResultScreenState extends ConsumerState<KundliResultScreen> {
     ('Panchang', Icons.today),
     ('Dosha', Icons.warning_amber),
     ('Yogas', Icons.psychology),
+    ('Conjunctions', Icons.join_inner),
+    ('Strength', Icons.fitness_center),
+    ('Ashtakavarga', Icons.grid_on),
     ('Remedies', Icons.healing),
     ('Interpretation', Icons.lightbulb_outline),
     ('Ask AI', Icons.chat_bubble_outline),
@@ -118,6 +126,14 @@ class _KundliResultScreenState extends ConsumerState<KundliResultScreen> {
     final c = _chartData;
     final id = widget.profileId;
     switch (featureTitle) {
+      case 'Synthesis':
+        _open(SynthesisScreen(chartData: c, profileId: id, name: widget.name));
+      case 'Conjunctions':
+        _open(ConjunctionsScreen(chartData: c, profileId: id, name: widget.name));
+      case 'Strength':
+        _open(StrengthScreen(chartData: c));
+      case 'Ashtakavarga':
+        _open(AshtakavargaScreen(chartData: c));
       case 'Planet':
         _open(GrahaScreen(chartData: c, profileId: id, name: widget.name));
       case 'Dasha':

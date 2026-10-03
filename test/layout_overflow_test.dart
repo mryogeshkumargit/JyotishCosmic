@@ -11,10 +11,12 @@ import 'package:mobile_jyotish/screens/dashboard_screen.dart';
 import 'package:mobile_jyotish/screens/kundali_milan_screen.dart';
 import 'package:mobile_jyotish/screens/kundali_screen.dart';
 import 'package:mobile_jyotish/screens/kundli_result_screen.dart';
+import 'package:mobile_jyotish/screens/knowledge_base_screen.dart';
 import 'package:mobile_jyotish/screens/rashifal_screen.dart';
 import 'package:mobile_jyotish/screens/report_screen.dart';
 import 'package:mobile_jyotish/screens/settings_screen.dart';
 import 'package:mobile_jyotish/theme/app_theme.dart';
+import 'package:mobile_jyotish/widgets/yoga_guide_view.dart';
 
 import 'helpers/sweph_test_helper.dart';
 
@@ -97,6 +99,7 @@ void main() {
           'rashifal': const RashifalScreen(),
           'report': const ReportScreen(),
           'settings': const SettingsScreen(),
+          'knowledge base': const KnowledgeBaseScreen(),
         };
         final failures = <String>[];
         for (final e in screens.entries) {
@@ -116,6 +119,18 @@ void main() {
           });
           failures.addAll(errors.map((m) => '${e.key}: $m'));
         }
+        for (final d in KnowledgeBaseScreen.documents) {
+          final errors = await collect(tester, () async {
+            await tester.pumpWidget(app(Scaffold(key: ValueKey(d.$3), body: MarkdownDocView(asset: d.$3)), db, scale));
+            for (int i = 0; i < 40 && find.byType(Scrollable).evaluate().isEmpty; i++) {
+              await settle(tester);
+            }
+            expect(find.byType(Scrollable), findsWidgets, reason: d.$1);
+            await tester.drag(find.byType(Scrollable).first, const Offset(0, -3000));
+            await settle(tester);
+          });
+          failures.addAll(errors.map((m) => '${d.$1}: $m'));
+        }
         await tester.pumpWidget(const SizedBox());
         await settle(tester);
         await tester.runAsync(db.close);
@@ -129,6 +144,7 @@ void main() {
         const features = [
           'Planet', 'Dasha', 'Predictions', 'KP System', 'Shodashvarga', 'Lal Kitab', 'Barshphal', 'Transit',
           'Nakshatra', 'Avasthas', 'Panchang', 'Dosha', 'Yogas', 'Remedies', 'Interpretation', 'Ask AI',
+      'Synthesis', 'Conjunctions', 'Strength', 'Ashtakavarga',
         ];
         final failures = <String>[];
         failures.addAll((await collect(tester, () async {

@@ -3,17 +3,26 @@ import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 /// The bundled "Comprehensive Guide to Yogas" (assets/docs/vedic_yogas_guide.md).
-class YogaGuideView extends StatefulWidget {
+class YogaGuideView extends StatelessWidget {
   const YogaGuideView({super.key});
 
   static const String asset = 'assets/docs/vedic_yogas_guide.md';
 
   @override
-  State<YogaGuideView> createState() => _YogaGuideViewState();
+  Widget build(BuildContext context) => const MarkdownDocView(asset: asset);
 }
 
-class _YogaGuideViewState extends State<YogaGuideView> {
-  late final Future<String> _text = rootBundle.loadString(YogaGuideView.asset);
+/// Renders a bundled Markdown document.
+class MarkdownDocView extends StatefulWidget {
+  final String asset;
+  const MarkdownDocView({super.key, required this.asset});
+
+  @override
+  State<MarkdownDocView> createState() => _MarkdownDocViewState();
+}
+
+class _MarkdownDocViewState extends State<MarkdownDocView> {
+  late final Future<String> _text = rootBundle.loadString(widget.asset, cache: false);
 
   @override
   Widget build(BuildContext context) {
@@ -21,7 +30,7 @@ class _YogaGuideViewState extends State<YogaGuideView> {
     return FutureBuilder<String>(
       future: _text,
       builder: (context, snapshot) {
-        if (snapshot.hasError) return Center(child: Text('Could not open the guide: ${snapshot.error}'));
+        if (snapshot.hasError) return Center(child: Text('Could not open the document: ${snapshot.error}'));
         if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
         return Markdown(
           data: snapshot.data!,
@@ -48,19 +57,6 @@ class _YogaGuideViewState extends State<YogaGuideView> {
           ),
         );
       },
-    );
-  }
-}
-
-/// Stand-alone page for the guide (opened from the dashboard).
-class YogaGuideScreen extends StatelessWidget {
-  const YogaGuideScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Yoga Guide')),
-      body: const YogaGuideView(),
     );
   }
 }

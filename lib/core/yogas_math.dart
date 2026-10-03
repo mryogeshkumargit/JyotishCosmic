@@ -1,6 +1,7 @@
 import 'doshas_math.dart';
 import 'ephemeris.dart';
 import 'planetary_dignity.dart';
+import 'precision_math.dart';
 import 'vedic_math.dart';
 
 /// Whether a yoga is traditionally favourable, adverse or mixed.
@@ -1437,7 +1438,7 @@ class _Chart {
   String name(String p) => VedicMath.planets[p]?.name ?? VedicMath.capitalize(p);
   String names(List<String> ps) => ps.map(name).join(', ');
   String signName(String p) => VedicMath.rashis[rashi(p)].name;
-  String dignity(String p) => has(p) ? PlanetaryDignity.getAdvancedDignity(p, rashi(p), rashis) : 'Unknown';
+  String dignity(String p) => has(p) ? PlanetaryDignity.getAdvancedDignity(p, rashi(p), rashis, degree: VedicMath.degInRashi(longs[p]!)) : 'Unknown';
 
   /// Moon's elongation from the Sun (0 = new, 180 = full).
   double get moonPhase => has('moon') && has('sun') ? VedicMath.norm360(longs['moon']! - longs['sun']!) : 180;
@@ -1576,6 +1577,7 @@ class _Chart {
       if (isCombust(p)) out.add('$n is combust, ${separation(p, 'sun').toStringAsFixed(1)}° from the Sun (−).');
       if (isRetro(p)) out.add('$n is retrograde (modifies expression and timing).');
       if (YogasMath.isDusthana(house(p))) out.add('$n sits in a dusthana, house ${house(p)} (−).');
+      if (ascendant != null && PrecisionMath.inSandhi(longs[p]!, ascendant!, 1)) out.add('$n is at a Bhāva-sandhi, which reduces its effectiveness (−).');
       if (p != 'rahu' && p != 'ketu') {
         final nv = navamsa(p);
         if (nv == rashi(p)) out.add('$n is vargottama (same sign in D1 and D9) (+).');

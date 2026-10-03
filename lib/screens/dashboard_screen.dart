@@ -9,7 +9,7 @@ import 'kundali_milan_screen.dart';
 import 'rashifal_screen.dart';
 import 'report_screen.dart';
 import 'tabs/interpretation_screen.dart';
-import '../widgets/yoga_guide_view.dart';
+import 'knowledge_base_screen.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -193,8 +193,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           _buildChip('Report', Icons.picture_as_pdf_outlined, () {
             Navigator.push(context, MaterialPageRoute(builder: (_) => const ReportScreen()));
           }),
-          _buildChip('Yoga Guide', Icons.auto_stories_outlined, () {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => const YogaGuideScreen()));
+          _buildChip('Knowledge Base', Icons.auto_stories_outlined, () {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const KnowledgeBaseScreen()));
           }),
         ],
       ),

@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../core/calc_config.dart';
 
 final settingsProvider = NotifierProvider<SettingsNotifier, SettingsState>(() {
   return SettingsNotifier();
@@ -52,6 +53,9 @@ class SettingsState {
   /// Models last loaded from each provider's `/models` endpoint.
   final Map<String, List<String>> modelCache;
 
+  /// Calculation conventions where traditions differ.
+  final CalcConfig calc;
+
   SettingsState({
     this.chartStyle = 'North',
     this.themeMode = 'Cosmic',
@@ -61,6 +65,7 @@ class SettingsState {
     this.apiKey = '',
     this.modelName = 'gpt-6.1-sol',
     this.modelCache = const {},
+    this.calc = CalcConfig.defaults,
   });
 
   /// Models to offer for [provider]: the live list if loaded, else suggestions.
@@ -79,6 +84,7 @@ class SettingsState {
     String? apiKey,
     String? modelName,
     Map<String, List<String>>? modelCache,
+    CalcConfig? calc,
   }) {
     return SettingsState(
       chartStyle: chartStyle ?? this.chartStyle,
@@ -89,6 +95,7 @@ class SettingsState {
       apiKey: apiKey ?? this.apiKey,
       modelName: modelName ?? this.modelName,
       modelCache: modelCache ?? this.modelCache,
+      calc: calc ?? this.calc,
     );
   }
 }
@@ -123,7 +130,17 @@ class SettingsNotifier extends Notifier<SettingsState> {
         for (final e in values.entries)
           if (e.key.startsWith('models_') && e.value.isNotEmpty) e.key.substring(7): e.value.split('\n'),
       };
+      CalcConfig calc = CalcConfig.defaults;
+      final na = values['calc_nodeAspects'];
+      final wr = values['calc_warRule'];
+      final orb = double.tryParse(values['calc_closeOrb'] ?? '');
+      calc = calc.copyWith(
+        nodeAspects: NodeAspectRule.values.where((v) => v.name == na).firstOrNull,
+        warRule: WarRule.values.where((v) => v.name == wr).firstOrNull,
+        closeConjunctionOrb: orb,
+      );
       state = state.copyWith(
+        calc: calc,
         modelCache: cache,
         chartStyle: values['chartStyle'],
         themeMode: values['themeMode'],
@@ -157,6 +174,15 @@ class SettingsNotifier extends Notifier<SettingsState> {
     await _storage.write(key: 'apiEndpoint', value: endpoint);
     await _storage.write(key: 'apiKey', value: key);
     await _storage.write(key: 'modelName', value: model);
+  }
+
+  Future<void> updateCalc(CalcConfig calc) async {
+    state = state.copyWith(calc: calc);
+    try {
+      await _storage.write(key: 'calc_nodeAspects', value: calc.nodeAspects.name);
+      await _storage.write(key: 'calc_warRule', value: calc.warRule.name);
+      await _storage.write(key: 'calc_closeOrb', value: calc.closeConjunctionOrb.toString());
+    } catch (_) {}
   }
 
   /// Remembers the live model list of [provider] (shown in the model picker).

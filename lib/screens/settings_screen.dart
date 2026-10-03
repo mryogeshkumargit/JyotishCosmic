@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import '../core/calc_config.dart';
 import '../providers/settings_provider.dart';
 import '../providers/sync_provider.dart';
 import '../services/ai_service.dart';
@@ -258,7 +259,54 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> with SingleTick
             messenger.showSnackBar(const SnackBar(content: Text('Appearance saved')));
           },
           child: const Text('Save Appearance'),
-        )
+        ),
+        const SizedBox(height: 40),
+        _sectionTitle('Calculation Conventions'),
+        const SizedBox(height: 8),
+        Text('Where Jyotisha traditions differ, choose the rule used by Conjunctions, Strength and Synthesis. Every report states the rule it used.',
+            style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+        const SizedBox(height: 16),
+        Consumer(builder: (context, ref, _) {
+          final calc = ref.watch(settingsProvider.select((s) => s.calc));
+          final notifier = ref.read(settingsProvider.notifier);
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              DropdownButtonFormField<NodeAspectRule>(
+                isExpanded: true,
+                key: ValueKey('na${calc.nodeAspects}'),
+                initialValue: calc.nodeAspects,
+                decoration: const InputDecoration(labelText: 'Rahu/Ketu aspects'),
+                items: [
+                  for (final v in NodeAspectRule.values)
+                    DropdownMenuItem(value: v, child: Text(calc.copyWith(nodeAspects: v).nodeAspectLabel, overflow: TextOverflow.ellipsis)),
+                ],
+                onChanged: (v) => notifier.updateCalc(calc.copyWith(nodeAspects: v)),
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<WarRule>(
+                isExpanded: true,
+                key: ValueKey('war${calc.warRule}'),
+                initialValue: calc.warRule,
+                decoration: const InputDecoration(labelText: 'Planetary war (Graha Yuddha) winner'),
+                items: [
+                  for (final v in WarRule.values)
+                    DropdownMenuItem(value: v, child: Text(calc.copyWith(warRule: v).warRuleLabel, overflow: TextOverflow.ellipsis)),
+                ],
+                onChanged: (v) => notifier.updateCalc(calc.copyWith(warRule: v)),
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<double>(
+                isExpanded: true,
+                key: ValueKey('orb${calc.closeConjunctionOrb}'),
+                initialValue: const [3.0, 5.0, 8.0, 10.0].contains(calc.closeConjunctionOrb) ? calc.closeConjunctionOrb : 5.0,
+                decoration: const InputDecoration(labelText: 'Close conjunction within'),
+                items: [for (final v in const [3.0, 5.0, 8.0, 10.0]) DropdownMenuItem(value: v, child: Text('${v.toStringAsFixed(0)}°'))],
+                onChanged: (v) => notifier.updateCalc(calc.copyWith(closeConjunctionOrb: v)),
+              ),
+            ],
+          );
+        }),
       ],
     );
   }
