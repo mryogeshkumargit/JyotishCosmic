@@ -94,9 +94,11 @@ class _ConjunctionCard extends ConsumerWidget {
           if (cj.activeNow.isNotEmpty) Pill('Active in current Daśā', scheme.primary),
           if (m.combustionLinks > 0) Pill('Combustion', scheme.error),
           if (m.warLinks > 0) const Pill('Graha Yuddha', Colors.orange),
+          if (cj.vargaRepetition.isNotEmpty) Pill('Repeated in ${cj.vargaRepetition.join(', ')}', Colors.green),
         ]),
         const SizedBox(height: 8),
         KeyValueRow('House domain', ConjunctionDb.bhavaDomains[r.bhava - 1]),
+        KeyValueRow('Sign modifier', cj.signModifier),
         KeyValueRow('Sign', '${r.element} · ${r.modality} · dispositor ${_n(r.dispositor)} (house ${cj.dispositorRecord.house}, ${cj.dispositorRecord.dignity})'),
         KeyValueRow('Core themes', r.coreThemes),
         KeyValueRow('Lordship', r.functionalLordshipText),
@@ -129,6 +131,11 @@ class _ConjunctionCard extends ConsumerWidget {
           style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 11),
         ),
         const SizedBox(height: 8),
+        Text('Cluster diagnostics', style: TextStyle(color: scheme.secondary, fontWeight: FontWeight.bold, fontSize: 13)),
+        _Diagnostics(cj.diagnostics),
+        if (cj.pairRepetitions.isNotEmpty) BulletLine('Pairs repeated in Vargas: ${cj.pairRepetitions.join('; ')}', mark: '✓', color: Colors.green),
+        for (final c in cj.cautions) BulletLine(c, mark: '⚠', color: Colors.orange),
+        const SizedBox(height: 8),
         Text('Members', style: TextStyle(color: scheme.secondary, fontWeight: FontWeight.bold, fontSize: 13)),
         for (final g in cj.grahas.values)
           BulletLine('${g.name} ${VedicMath.formatDegree(g.longitude)} · ${g.dignity}${g.retrograde ? ' · retrograde' : ''}${g.combust ? ' · combust (${g.sunDistance!.toStringAsFixed(1)}°)' : ''}'
@@ -147,6 +154,7 @@ class _ConjunctionCard extends ConsumerWidget {
           tilePadding: EdgeInsets.zero,
           title: const Text('Database pair records (Volume 2)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
           children: [
+            for (final (pair, obs) in cj.classicalObservations) BulletLine('$pair: $obs', tag: 'Ph. 18'),
             for (final t in r.pairTexts())
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
@@ -154,6 +162,7 @@ class _ConjunctionCard extends ConsumerWidget {
                   Text('${t.id} ${t.pair}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                   BulletLine(t.bhava, tag: 'Bhāva'),
                   BulletLine(t.rashi, tag: 'Rāśi'),
+                  BulletLine(ConjunctionDb.pairSignModifierText(ConjunctionDb.planetsOf(t.id)[0], ConjunctionDb.planetsOf(t.id)[1], r.rashi), tag: 'Sign'),
                   BulletLine(t.lagna, tag: 'Lagna'),
                 ]),
               ),
@@ -172,6 +181,8 @@ class _ConjunctionCard extends ConsumerWidget {
                   'Cluster ${r.clusterId}: ${r.clusterLabel} in house ${r.bhava} (${ConjunctionDb.bhavaDomains[r.bhava - 1]}), ${VedicMath.rashis[r.rashi].name}, '
                   'dispositor ${_n(r.dispositor)}. Lordship: ${r.functionalLordshipText}.\n'
                   'Pairs: ${cj.edges.map((e) => '${_n(e.a)}–${_n(e.b)} ${e.separation.toStringAsFixed(2)}° ${e.applying ? 'applying' : 'separating'}${e.combustionLink ? ', combust' : ''}${e.war != null ? ', planetary war' : ''}').join('; ')}.\n'
+                  'Sign modifier: ${cj.signModifier}. ${cj.vargaRepetition.isEmpty ? 'Not repeated in D9/D10.' : 'Repeated in ${cj.vargaRepetition.join(', ')}.'}\n'
+                  'Cautions: ${cj.cautions.join(' ')}\n'
                   'Members: ${cj.grahas.values.map((g) => '${g.name} ${g.dignity}${g.retrograde ? ' retrograde' : ''}').join('; ')}.\n'
                   'Timing: ${[...cj.activeNow, ...upcoming.take(3).map((u) => '${_n(u.mahaLord)}/${_n(u.lord)} ${u.start}-${u.end}')].join('; ')}.\n\n'
                   'Chart:\n${ChartSummary.describe(cj.chart, name: name)}';
@@ -301,6 +312,7 @@ class _DatabaseTabState extends State<_DatabaseTab> {
                       Text('${t.id} ${t.pair}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                       BulletLine(t.bhava, tag: 'Bhāva'),
                       BulletLine(t.rashi, tag: 'Rāśi'),
+                  BulletLine(ConjunctionDb.pairSignModifierText(ConjunctionDb.planetsOf(t.id)[0], ConjunctionDb.planetsOf(t.id)[1], r.rashi), tag: 'Sign'),
                       BulletLine(t.lagna, tag: 'Lagna'),
                     ]),
                   ),
@@ -310,5 +322,26 @@ class _DatabaseTabState extends State<_DatabaseTab> {
         ),
       ],
     );
+  }
+}
+
+/// Volume 6 §18 cluster compression (engineering diagnostics).
+class _Diagnostics extends StatelessWidget {
+  final ClusterDiagnostics d;
+  const _Diagnostics(this.d);
+
+  @override
+  Widget build(BuildContext context) {
+    String n(String p) => VedicMath.planets[p]?.name ?? p;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      KeyValueRow('Degree span', '${d.degreeSpan.toStringAsFixed(2)}° around ${VedicMath.formatDegree(d.centerLongitude)} ${VedicMath.rashis[VedicMath.rashiIndex(d.centerLongitude)].name}'),
+      if (d.nearestPair != null) KeyValueRow('Nearest / widest', '${n(d.nearestPair!.a)}–${n(d.nearestPair!.b)} / ${n(d.widestPair!.a)}–${n(d.widestPair!.b)}'),
+      KeyValueRow('Central planet', n(d.centralPlanet)),
+      KeyValueRow('Strength profile',
+          'compactness ${d.compactness.toStringAsFixed(2)} · dignity coherence ${d.dignityCoherence.toStringAsFixed(2)} (${d.dominantDignity}) · '
+          'house coherence ${d.houseCoherence.toStringAsFixed(2)} · activation ${d.activationPotential.toStringAsFixed(2)}'),
+      Text('${ClusterDiagnostics.classification}: engineering diagnostics, not classical scores.',
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 11)),
+    ]);
   }
 }

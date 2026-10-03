@@ -2,8 +2,11 @@ import 'ashtakavarga_math.dart';
 import 'calc_config.dart';
 import 'conjunction_db.dart';
 import 'ephemeris.dart';
+import 'jaimini_math.dart';
+import 'knowledge_registry.dart';
 import 'precision_math.dart';
 import 'shadbala_math.dart';
+import 'timing_math.dart';
 import 'vedic_math.dart';
 import 'yogas_math.dart';
 
@@ -39,14 +42,48 @@ enum PredictionStatus {
   const PredictionStatus(this.code, this.label);
 }
 
+/// Volume 6 §45 prediction states (not numerical rankings).
+enum V6Status {
+  notSupported('NOT_SUPPORTED'),
+  natalPromise('NATAL_PROMISE'),
+  supported('SUPPORTED'),
+  activated('ACTIVATED'),
+  timingWindow('TIMING_WINDOW'),
+  confirmedByTransit('CONFIRMED_BY_TRANSIT'),
+  conflicted('CONFLICTED'),
+  insufficientData('INSUFFICIENT_DATA');
+
+  final String code;
+  const V6Status(this.code);
+}
+
+/// Volume 6 §46 evidence states; never a percentage.
+enum Confidence {
+  low('LOW'),
+  moderate('MODERATE'),
+  strong('STRONG'),
+  veryStrong('VERY_STRONG'),
+  conflicted('CONFLICTED'),
+  insufficient('INSUFFICIENT');
+
+  final String code;
+  const Confidence(this.code);
+}
+
 class Evidence {
   final EvidenceLayer layer;
   final Polarity polarity;
   final String text;
   final SourceTier tier;
+
+  /// Classical or engine locator (free text).
   final String rule;
+  final String? _ruleId;
   String id = '';
-  Evidence(this.layer, this.polarity, this.text, this.tier, this.rule);
+  Evidence(this.layer, this.polarity, this.text, this.tier, this.rule, {String? ruleId}) : _ruleId = ruleId;
+
+  /// Registry rule (R001...) this evidence was produced by.
+  String get ruleId => _ruleId ?? KnowledgeRegistry.ruleIdFor(rule);
 
   String get mark => switch (polarity) { Polarity.support => '✓', Polarity.obstruction => '✗', Polarity.neutral => '△' };
 }
@@ -56,10 +93,52 @@ class LifeDomain {
   final String name;
   final List<int> bhavas;
   final List<String> karakas;
+
+  /// Primary Varga for the domain.
   final String varga;
   final List<String> dimensions;
   final String? caution;
-  const LifeDomain(this.id, this.name, this.bhavas, this.karakas, this.varga, this.dimensions, {this.caution});
+
+  /// Master KB event-domain code (E01-E12; A01-A02 are app additions).
+  final String code;
+
+  /// Volume 6 §43 domain name.
+  final String v6Name;
+
+  /// Supporting Vargas (Master KB prediction dependencies), D1 first.
+  final List<String> vargas;
+  const LifeDomain(this.id, this.name, this.bhavas, this.karakas, this.varga, this.dimensions,
+      {this.caution, required this.code, required this.v6Name, required this.vargas});
+}
+
+/// Explanation graph (Volume 6 §61): every node has a stable ID.
+class ExplanationNode {
+  final String id;
+  final String type;
+  final String label;
+  const ExplanationNode(this.id, this.type, this.label);
+  Map<String, String> toJson() => {'id': id, 'type': type, 'label': label};
+}
+
+class ExplanationEdge {
+  final String from;
+  final String to;
+  final String relation;
+  const ExplanationEdge(this.from, this.to, this.relation);
+  Map<String, String> toJson() => {'from': from, 'to': to, 'relation': relation};
+}
+
+class ExplanationGraph {
+  final Map<String, ExplanationNode> nodes = {};
+  final List<ExplanationEdge> edges = [];
+
+  void node(String id, String type, String label) => nodes.putIfAbsent(id, () => ExplanationNode(id, type, label));
+  void edge(String from, String to, String relation) {
+    if (!edges.any((e) => e.from == from && e.to == to && e.relation == relation)) edges.add(ExplanationEdge(from, to, relation));
+  }
+
+  List<ExplanationEdge> from(String id) => edges.where((e) => e.from == id).toList();
+  Map<String, dynamic> toJson() => {'nodes': [for (final n in nodes.values) n.toJson()], 'edges': [for (final e in edges) e.toJson()]};
 }
 
 /// An event window: a period whose Daśā lords activate a domain (Volume 5 §19).
@@ -95,7 +174,51 @@ class DomainSynthesis {
   final List<EventWindow> windows;
   final List<TransitContact> transits;
 
-  const DomainSynthesis(this.domain, this.evidence, this.lordChains, this.statuses, this.tier, this.interpretation, this.windows, this.transits);
+  /// Volume 6 state and evidence-state confidence.
+  final V6Status v6Status;
+  final Confidence confidence;
+
+  /// Master KB required layers -> SUPPORTING / OPPOSING / MIXED / ABSENT / NOT_APPLICABLE.
+  final Map<String, String> dependencies;
+
+  /// Master KB status policy: SUPPORTED, CONDITIONALLY_SUPPORTED, CONFLICTED, INSUFFICIENT_INPUT.
+  final String masterStatus;
+
+  /// Degree-exact transit triggers on this domain's factors (next three years).
+  final List<TransitTrigger> triggers;
+
+  /// Daśā ∩ transit windows (Volume 6 §91-92).
+  final List<TimingWindow> timingWindows;
+
+  /// Rule trace (Volume 6 §62): rule id -> fired.
+  final Map<String, bool> ruleTrace;
+  final ExplanationGraph graph;
+
+  DomainSynthesis(this.domain, this.evidence, this.lordChains, this.statuses, this.tier, this.interpretation, this.windows, this.transits,
+      {this.v6Status = V6Status.natalPromise,
+      this.confidence = Confidence.low,
+      this.dependencies = const {},
+      this.masterStatus = 'CONDITIONALLY_SUPPORTED',
+      this.triggers = const [],
+      this.timingWindows = const [],
+      this.ruleTrace = const {},
+      ExplanationGraph? graph})
+      : graph = graph ?? ExplanationGraph();
+
+  List<String> get supportingFactors => [for (final e in evidence) if (e.polarity == Polarity.support) e.text];
+  List<String> get contradictions => [for (final e in evidence) if (e.polarity == Polarity.obstruction) e.text];
+
+  /// Volume 6 §60 explanation object.
+  Map<String, dynamic> explanation() => {
+        'claim': interpretation,
+        'event_domain': domain.v6Name,
+        'status': v6Status.code,
+        'confidence': confidence.code,
+        'support': [for (final e in evidence) if (e.polarity == Polarity.support) {'factor': e.text, 'layer': e.layer.label, 'rule': e.ruleId}],
+        'modifiers': [for (final e in evidence) if (e.polarity == Polarity.neutral) {'factor': e.text, 'layer': e.layer.label, 'rule': e.ruleId}],
+        'contradictions': [for (final e in evidence) if (e.polarity == Polarity.obstruction) {'factor': e.text, 'layer': e.layer.label, 'rule': e.ruleId}],
+        'source_refs': {for (final e in evidence) ...KnowledgeRegistry.rule(e.ruleId).sourceIds}.toList()..sort(),
+      };
 
   List<Evidence> layer(EvidenceLayer l) => evidence.where((e) => e.layer == l).toList();
   List<Evidence> get conflicts => evidence.where((e) => e.polarity == Polarity.obstruction).toList();
@@ -122,11 +245,18 @@ class DomainSynthesis {
       if (items.isEmpty) continue;
       b.writeln('\n${l.label.toUpperCase()} (Level ${l.level}):');
       for (final e in items) {
-        b.writeln('${e.mark} [${e.id}] ${e.text}');
+        b.writeln('${e.mark} [${e.id}/${e.ruleId}] ${e.text}');
       }
     }
     b.writeln('\nSTATUS: ${statuses.map((s) => s.code).join(', ')}');
+    b.writeln('V6 STATUS: ${v6Status.code}; CONFIDENCE: ${confidence.code}; MASTER KB: $masterStatus');
     b.writeln('SOURCE TIER: ${tier.code}');
+    if (timingWindows.isNotEmpty) {
+      b.writeln('\nTIMING WINDOWS:');
+      for (final w in timingWindows.take(5)) {
+        b.writeln('${w.start} – ${w.end}: ${w.activation.join(', ')} [${w.status}]');
+      }
+    }
     b.writeln('\nRESULT: $interpretation');
     return b.toString();
   }
@@ -144,7 +274,9 @@ class SynthesisReport {
   final List<InputFlag> inputFlags;
   final Map<String, String> audit;
   final List<String> running;
-  const SynthesisReport(this.chart, this.domains, this.inputFlags, this.audit, this.running);
+  final JaiminiResult? jaimini;
+  final SensitivityResult? sensitivity;
+  const SynthesisReport(this.chart, this.domains, this.inputFlags, this.audit, this.running, {this.jaimini, this.sensitivity});
 }
 
 /// Candidate birth time for rectification (Volume 5 §42).
@@ -177,7 +309,7 @@ class BacktestResult {
 /// Daśā, transit, Varga and Ashtakavarga layers into auditable evidence.
 class SynthesisEngine {
   static const String sourceVersions =
-      'Conjunction Database Vol. 2 (3 Oct 2026), Vol. 3 (3 Oct 2026), Vol. 4 (3 Oct 2026), Vol. 5 (3 Oct 2026); Yoga guide (2 Oct 2026)';
+      'Conjunction Database Vol. 2-6 (3 Oct 2026); Master Knowledge Base v1.0.0; Production Knowledge Graph v1.0.0; Conjunctions Deep Research; Yoga guide (2 Oct 2026)';
 
   static const Map<int, List<String>> houseKarakas = {
     1: ['sun'], 2: ['jupiter'], 3: ['mars'], 4: ['moon'], 5: ['jupiter'], 6: ['mars', 'saturn'], 7: ['venus'],
@@ -185,33 +317,43 @@ class SynthesisEngine {
   };
 
   static const List<LifeDomain> domains = [
-    LifeDomain('identity', 'Identity & vitality', [1], ['sun'], 'D1', ['temperament', 'self-direction', 'vitality']),
+    LifeDomain('identity', 'Identity & vitality', [1], ['sun'], 'D1', ['temperament', 'self-direction', 'vitality'],
+        code: 'E01', v6Name: 'IDENTITY', vargas: ['D1', 'D27', 'D60']),
     LifeDomain('wealth', 'Wealth & savings', [2, 11, 5, 9], ['jupiter', 'venus'], 'D2',
-        ['accumulated wealth', 'income', 'speculation', 'fortune'], caution: 'Debt and loss are judged separately from the 6th, 8th and 12th.'),
-    LifeDomain('skills', 'Skills, communication & siblings', [3], ['mars', 'mercury'], 'D3', ['initiative', 'communication', 'younger siblings']),
+        ['accumulated wealth', 'income', 'speculation', 'fortune'], caution: 'Debt and loss are judged separately from the 6th, 8th and 12th.',
+        code: 'E02', v6Name: 'WEALTH', vargas: ['D1', 'D2']),
+    LifeDomain('skills', 'Skills, communication & siblings', [3], ['mars', 'mercury'], 'D3', ['initiative', 'communication', 'younger siblings'],
+        code: 'E03', v6Name: 'COMMUNICATION', vargas: ['D1', 'D3']),
     LifeDomain('home', 'Home, property & mother', [4, 2, 11], ['moon', 'venus', 'mars'], 'D4',
-        ['acquisition', 'construction', 'relocation', 'sale', 'inheritance']),
-    LifeDomain('children', 'Children & creativity', [5], ['jupiter'], 'D7', ['children', 'creativity', 'intelligence']),
+        ['acquisition', 'construction', 'relocation', 'sale', 'inheritance'], code: 'E04', v6Name: 'HOME_PROPERTY', vargas: ['D1', 'D4', 'D16']),
+    LifeDomain('children', 'Children & creativity', [5], ['jupiter'], 'D7', ['children', 'creativity', 'intelligence'],
+        code: 'E05', v6Name: 'CHILDREN_CREATIVITY', vargas: ['D1', 'D7', 'D24']),
     LifeDomain('health', 'Health, service & competition', [6, 1, 8], ['sun', 'moon'], 'D30', ['routines', 'competition', 'debts', 'vitality'],
-        caution: 'Traditional indications only; not a medical assessment.'),
+        caution: 'Traditional indications only; not a medical assessment.', code: 'E06', v6Name: 'HEALTH_SERVICE', vargas: ['D1', 'D27', 'D30']),
     LifeDomain('marriage', 'Marriage & partnership', [7, 2], ['venus', 'jupiter'], 'D9',
-        ['relationship activation', 'partnership formation', 'formalisation', 'strain', 'separation indicators']),
-    LifeDomain('transformation', 'Transformation, inheritance & research', [8], ['saturn'], 'D30', ['research', 'joint resources', 'major change']),
-    LifeDomain('fortune', 'Fortune, father & higher learning', [9], ['jupiter', 'sun'], 'D9', ['fortune', 'father/guru', 'pilgrimage']),
+        ['relationship activation', 'partnership formation', 'formalisation', 'strain', 'separation indicators'],
+        code: 'E07', v6Name: 'MARRIAGE_PARTNERSHIP', vargas: ['D1', 'D9']),
+    LifeDomain('transformation', 'Transformation, inheritance & research', [8], ['saturn'], 'D30', ['research', 'joint resources', 'major change'],
+        code: 'E08', v6Name: 'TRANSFORMATION', vargas: ['D1', 'D30', 'D60']),
+    LifeDomain('fortune', 'Fortune, father & higher learning', [9], ['jupiter', 'sun'], 'D9', ['fortune', 'father/guru', 'pilgrimage'],
+        code: 'E09', v6Name: 'FORTUNE_HIGHER_LEARNING', vargas: ['D1', 'D9', 'D12', 'D20', 'D40', 'D45', 'D60']),
     LifeDomain('career', 'Career & status', [10, 6, 11], ['sun', 'saturn', 'mercury', 'jupiter'], 'D10',
-        ['employment', 'promotion/authority', 'role change', 'business', 'professional conflict', 'gains from work']),
-    LifeDomain('gains', 'Gains & networks', [11], ['jupiter'], 'D1', ['income channels', 'networks', 'ambitions']),
+        ['employment', 'promotion/authority', 'role change', 'business', 'professional conflict', 'gains from work'],
+        code: 'E10', v6Name: 'CAREER', vargas: ['D1', 'D10']),
+    LifeDomain('gains', 'Gains & networks', [11], ['jupiter'], 'D1', ['income channels', 'networks', 'ambitions'],
+        code: 'E11', v6Name: 'GAINS_NETWORK', vargas: ['D1']),
     LifeDomain('foreign', 'Expenditure, foreign lands & retreat', [12, 9, 7, 4], ['saturn', 'rahu', 'moon'], 'D12',
-        ['travel', 'temporary stay', 'relocation', 'foreign work', 'long-term residence']),
+        ['travel', 'temporary stay', 'relocation', 'foreign work', 'long-term residence'],
+        code: 'E12', v6Name: 'FOREIGN_RETREAT', vargas: ['D1', 'D30', 'D12']),
     LifeDomain('education', 'Education & intelligence', [4, 5, 9], ['mercury', 'jupiter'], 'D24',
-        ['foundational education', 'higher education', 'specialised study', 'teaching/research']),
+        ['foundational education', 'higher education', 'specialised study', 'teaching/research'],
+        code: 'A01', v6Name: 'EDUCATION', vargas: ['D1', 'D24']),
     LifeDomain('spiritual', 'Spiritual practice & research', [5, 9, 12, 8], ['jupiter', 'ketu'], 'D20',
-        ['spiritual practice', 'academic research', 'esoteric interests', 'life transformation']),
+        ['spiritual practice', 'academic research', 'esoteric interests', 'life transformation'],
+        code: 'A02', v6Name: 'SPIRITUAL', vargas: ['D1', 'D20']),
   ];
 
-  static const Map<String, int> _divisions = {
-    'D1': 1, 'D2': 2, 'D3': 3, 'D4': 4, 'D7': 7, 'D9': 9, 'D10': 10, 'D12': 12, 'D16': 16, 'D20': 20, 'D24': 24, 'D30': 30,
-  };
+  static final Map<String, int> _divisions = {for (final v in VedicMath.vargaDefs) v.key: v.div};
 
   static String _n(String p) => VedicMath.planets[p]?.name ?? p;
   static String lordOf(ChartData c, int house) => VedicMath.rashis[(c.lagnaRashi + house - 1) % 12].lord;
@@ -266,8 +408,15 @@ class SynthesisEngine {
     return out.toSet().toList();
   }
 
+  /// Rules every domain evaluates; conditional rules are added when they apply.
+  static const List<String> _domainRules = [
+    'R001', 'R012', 'R029', 'R028', 'R003', 'R026', 'R016', 'R017', 'R018', 'R009', 'R025', 'R010', 'R011', 'R007', 'R004', 'R030',
+    'R005', 'R021', 'R006', 'R022', 'R013', 'R014', 'R015',
+  ];
+
   /// Ashtakavarga, Shadbala and other heavy layers are computed once per chart.
-  static SynthesisReport analyse(ChartData c, {CalcConfig cfg = CalcConfig.defaults, double? atJd, bool includeTransits = true}) {
+  static SynthesisReport analyse(ChartData c,
+      {CalcConfig cfg = CalcConfig.defaults, double? atJd, bool includeTransits = true, bool includeSensitivity = true}) {
     final now = atJd ?? Ephemeris.nowJd();
     final flags = inputFlags(c, cfg);
     final sb = ShadbalaMath.compute(c, cfg: cfg);
@@ -278,21 +427,36 @@ class SynthesisEngine {
     final conjunctions = ConjunctionDb.find(c, cfg: cfg, atJd: now);
     final dashas = DashaCalculations.compute(c.jd, c.planetLongitudes['moon']!, utcOffset: c.utcOffset);
     final running = dashas.runningAt(now);
+    final jaimini = JaiminiMath.compute(c, scheme: cfg.karakaScheme);
     ChartData? transit;
+    var allTriggers = <TransitTrigger>[];
     if (includeTransits) {
       try {
         transit = Ephemeris.computeChartForJd(now, c.lat, c.lon, utcOffset: c.utcOffset);
+        allTriggers = TimingMath.triggers(c, TimingMath.natalTargets(c), fromJd: now, orb: cfg.transitOrb);
       } catch (_) {
         transit = null;
       }
     }
+    SensitivityResult? sensitivity;
+    if (includeSensitivity) {
+      try {
+        sensitivity = TimingMath.sensitivity((m) => Ephemeris.computeChartForJd(c.jd + m / 1440, c.lat, c.lon, utcOffset: c.utcOffset),
+            scheme: cfg.karakaScheme);
+      } catch (_) {
+        sensitivity = null;
+      }
+    }
     final meanBhava = sb.bhavas.fold<double>(0, (s, b) => s + b.total) / 12;
+    var executed = 0, triggered = 0, conflicted = 0;
 
     final out = <DomainSynthesis>[];
     for (final d in domains) {
       final ev = <Evidence>[];
       final chains = <String>[];
-      void add(EvidenceLayer l, Polarity p, String t, SourceTier tier, String rule) => ev.add(Evidence(l, p, t, tier, rule));
+      final rulesRun = <String>{..._domainRules};
+      void add(EvidenceLayer l, Polarity p, String t, SourceTier tier, String rule, {String? ruleId}) =>
+          ev.add(Evidence(l, p, t, tier, rule, ruleId: ruleId));
 
       // ---------------- A: natal promise ----------------
       for (final h in d.bhavas) {
@@ -302,8 +466,11 @@ class SynthesisEngine {
         final r = recs[lord]!;
         final dispositor = r.dispositor;
         final dispRec = recs[dispositor]!;
+        final disp2 = dispRec.dispositor;
+        final disp2Rec = recs[disp2]!;
         chains.add('${VedicMath.ordinal(h)} Bhāva → ${_n(lord)} → ${VedicMath.rashis[r.rashi].name} (house $hl) → '
-            '${_n(dispositor)} → house ${dispRec.house} (${dispRec.dignity}${sb.planets[dispositor] != null ? ', Shadbala ${sb.planets[dispositor]!.ratio.toStringAsFixed(2)}×' : ''})');
+            '${_n(dispositor)} → house ${dispRec.house} (${dispRec.dignity}${sb.planets[dispositor] != null ? ', Shadbala ${sb.planets[dispositor]!.ratio.toStringAsFixed(2)}×' : ''})'
+            '${disp2 != dispositor ? ' → ${_n(disp2)} → house ${disp2Rec.house} (${disp2Rec.dignity})' : ' (own-sign terminus)'}');
         if (!primary && hl != h && !YogasMath.isDusthana(hl) && !YogasMath.isKendra(hl) && !YogasMath.isTrikona(hl)) continue;
         if (YogasMath.isDusthana(h) && YogasMath.isDusthana(hl)) {
           add(EvidenceLayer.natal, Polarity.support, '${VedicMath.ordinal(h)} lord ${_n(lord)} in the ${VedicMath.ordinal(hl)}: a dusthana lord in a dusthana (Viparīta reversal).',
@@ -322,7 +489,7 @@ class SynthesisEngine {
           if (ben) {
             add(EvidenceLayer.natal, Polarity.support, '${_n(p)} (benefic) occupies the ${VedicMath.ordinal(h)}.', SourceTier.classicalDerived, 'Phaladeepika bhava analysis');
           } else if (YogasMath.isUpachaya(h)) {
-            add(EvidenceLayer.natal, Polarity.support, '${_n(p)} (malefic) in the ${VedicMath.ordinal(h)}, an Upachaya, where malefics do well.', SourceTier.classicalDerived, 'Phaladeepika bhava analysis');
+            add(EvidenceLayer.natal, Polarity.support, '${_n(p)} (malefic) in the ${VedicMath.ordinal(h)}, an Upachaya, where malefics do well.', SourceTier.classicalDerived, 'Phaladeepika bhava analysis (Upachaya)');
           } else {
             add(EvidenceLayer.natal, Polarity.obstruction, '${_n(p)} (malefic) occupies the ${VedicMath.ordinal(h)}.', SourceTier.classicalDerived, 'Phaladeepika bhava analysis');
           }
@@ -340,6 +507,12 @@ class SynthesisEngine {
           add(EvidenceLayer.natal, Polarity.neutral,
               'Conjunction ${cj.record.clusterId} (${cj.record.clusterLabel}) in the ${VedicMath.ordinal(h)}; closest pair ${cj.closestPair == null ? '-' : '${_n(cj.closestPair!.a)}–${_n(cj.closestPair!.b)} ${cj.closestPair!.separation.toStringAsFixed(1)}°'}.',
               SourceTier.systematicSynthesis, 'Conjunction DB ${cj.record.recordId}');
+          final rep = ConjunctionDb.vargaRepetition(c, cj.record.planets, [...{'D9', ...d.vargas.where((v) => v != 'D1')}]);
+          if (rep.isNotEmpty) {
+            rulesRun.add('R024');
+            add(EvidenceLayer.varga, Polarity.support, 'The ${cj.record.planets.map(_n).join('–')} conjunction repeats in ${rep.join(', ')}, which strengthens it.',
+                SourceTier.systematicSynthesis, 'Varga repetition of a conjunction', ruleId: 'R024');
+          }
         }
       }
       for (final k in d.karakas) {
@@ -351,13 +524,14 @@ class SynthesisEngine {
           add(EvidenceLayer.natal, Polarity.obstruction, 'Karaka ${_n(k)} is ${r.combust ? 'combust' : 'debilitated'}.', SourceTier.classicalDerived, 'Karaka layer (Vol. 5 §31)');
         }
       }
+      _jaiminiEvidence(c, d, jaimini, recs, add, rulesRun);
       final lords = {for (final h in d.bhavas) lordOf(c, h)};
       for (final y in yogas) {
         if (!y.planets.any(lords.contains)) continue;
         if (y.category.startsWith('Nabhasa') || y.category == YogaFamilies.arishta || y.category == YogaFamilies.pravrajya) continue;
         add(EvidenceLayer.natal, y.nature == YogaNature.adverse ? Polarity.obstruction : Polarity.support,
             '${y.name} involves ${y.planets.where(lords.contains).map(_n).join(', ')} (${y.strength}).',
-            SourceTier.classicalDirect, y.source);
+            SourceTier.classicalDirect, y.source, ruleId: 'R016');
       }
 
       // ---------------- B: strength ----------------
@@ -380,30 +554,31 @@ class SynthesisEngine {
       for (final w in wars.where((w) => w.a == primaryLord || w.b == primaryLord)) {
         add(EvidenceLayer.strength, w.winner == primaryLord ? Polarity.support : Polarity.obstruction,
             '${_n(primaryLord)} is in planetary war with ${_n(w.a == primaryLord ? w.b : w.a)} and ${w.winner == primaryLord ? 'wins' : (w.winner == null ? 'the result is undetermined' : 'loses')}.',
-            SourceTier.configurableTradition, w.rule);
+            SourceTier.configurableTradition, w.rule, ruleId: 'R010');
       }
       if (pr.dignity == 'Debilitated') add(EvidenceLayer.strength, Polarity.obstruction, '${_n(primaryLord)} is debilitated.', SourceTier.classicalDerived, 'Dignity');
       if (pr.dignity == 'Exalted' || pr.dignity == 'Moolatrikona' || pr.dignity == 'Own Sign') {
         add(EvidenceLayer.strength, Polarity.support, '${_n(primaryLord)} is ${pr.dignity.toLowerCase()}.', SourceTier.classicalDerived, 'Dignity');
       }
 
-      // ---------------- E: varga ----------------
-      final div = _divisions[d.varga] ?? 1;
-      if (d.varga != 'D1') {
-        final vLagna = VedicMath.vargaRashi(c.ascendantSidereal, d.varga, div);
-        final vSign = VedicMath.vargaRashi(c.planetLongitudes[primaryLord]!, d.varga, div);
+      // ---------------- E: varga (every supporting Varga of the domain) ----------------
+      for (final vk in d.vargas) {
+        if (vk == 'D1') continue;
+        final div = _divisions[vk] ?? 1;
+        final vLagna = VedicMath.vargaRashi(c.ascendantSidereal, vk, div);
+        final vSign = VedicMath.vargaRashi(c.planetLongitudes[primaryLord]!, vk, div);
         final vHouse = VedicMath.houseOf(vSign, vLagna);
         final p = VedicMath.planets[primaryLord]!;
         final dign = p.exalt == vSign ? 'exalted' : (p.debi == vSign ? 'debilitated' : (p.ownSigns.contains(vSign) ? 'in its own sign' : null));
         final good = YogasMath.isKendra(vHouse) || YogasMath.isTrikona(vHouse) || dign == 'exalted' || dign == 'in its own sign';
         final bad = YogasMath.isDusthana(vHouse) || dign == 'debilitated';
         add(EvidenceLayer.varga, good && !bad ? Polarity.support : (bad && !good ? Polarity.obstruction : Polarity.neutral),
-            '${d.varga}: ${_n(primaryLord)} in ${VedicMath.rashis[vSign].name}, house $vHouse from the ${d.varga} Lagna${dign != null ? ', $dign' : ''}.',
+            '$vk: ${_n(primaryLord)} in ${VedicMath.rashis[vSign].name}, house $vHouse from the $vk Lagna${dign != null ? ', $dign' : ''}.',
             SourceTier.classicalDerived, 'BPHS Shodashavarga');
       }
 
       // ---------------- C: dasha ----------------
-      const levels = ['Mahādaśā', 'Antardaśā', 'Pratyantardaśā'];
+      const levels = ['Mahādaśā', 'Antardaśā', 'Pratyantardaśā', 'Sūkṣmadaśā'];
       final activeLevels = <int>[];
       for (int i = 0; i < running.length && i < 3; i++) {
         final lord = running[i].lord;
@@ -435,6 +610,7 @@ class SynthesisEngine {
 
       // ---------------- D: transit ----------------
       final contacts = <TransitContact>[];
+      final domainTriggers = triggersFor(c, d, allTriggers);
       if (transit != null) {
         for (final tp in ['jupiter', 'saturn', 'rahu']) {
           final tr = VedicMath.rashiIndex(transit.planetLongitudes[tp]!);
@@ -448,9 +624,9 @@ class SynthesisEngine {
               add(EvidenceLayer.transit, tp == 'jupiter' || (tp == 'saturn' && YogasMath.isUpachaya(h)) ? Polarity.support : Polarity.neutral,
                   'Transit ${_n(tp)} in ${VedicMath.rashis[tr].name} ${tr == target ? 'passes through' : 'aspects'} the ${VedicMath.ordinal(h)}'
                   '${tp == 'rahu' ? '' : '; $support'}.',
-                  SourceTier.classicalDerived, 'Phaladeepika transit chapter; BPHS Ashtakavarga');
+                  SourceTier.classicalDerived, 'Phaladeepika transit chapter; BPHS Ashtakavarga', ruleId: 'R005');
               if (tp != 'rahu' && bindus < 4 && tp == 'jupiter') {
-                add(EvidenceLayer.ashtakavarga, Polarity.obstruction, 'Transit Jupiter has only $bindus bindus in ${VedicMath.rashis[tr].name}.', SourceTier.classicalDerived, 'BPHS Ashtakavarga');
+                add(EvidenceLayer.ashtakavarga, Polarity.obstruction, 'Transit Jupiter has only $bindus bindus in ${VedicMath.rashis[tr].name}.', SourceTier.classicalDerived, 'BPHS Ashtakavarga', ruleId: 'R006');
               }
             }
           }
@@ -470,8 +646,13 @@ class SynthesisEngine {
           final p = VedicMath.planets[lord]!;
           if (p.exalt == tr || p.ownSigns.contains(tr)) {
             add(EvidenceLayer.transit, Polarity.support, 'Daśā lord ${_n(lord)} transits its ${p.exalt == tr ? 'exaltation' : 'own'} sign ${VedicMath.rashis[tr].name}, strengthening the houses it represents.',
-                SourceTier.classicalDirect, 'Phaladeepika (transit of the Daśā planet)');
+                SourceTier.classicalDirect, 'Phaladeepika (transit of the Daśā planet)', ruleId: 'R005');
           }
+        }
+        for (final t in domainTriggers.where((t) => t.activeAt(now))) {
+          add(EvidenceLayer.transit, t.transit == 'jupiter' ? Polarity.support : Polarity.neutral,
+              '${t.summary}; ${t.applyingAt(now) ? 'applying' : 'separating'} now.',
+              SourceTier.systematicSynthesis, 'Degree-exact transit trigger', ruleId: 'R021');
         }
         contacts.addAll(_ingresses(c, d, now));
       }
@@ -488,7 +669,7 @@ class SynthesisEngine {
         ..addAll(ordered);
       int i = 1;
       for (final e in ev) {
-        e.id = 'R${i++}';
+        e.id = '${d.code}-EV${i++}';
       }
       final natalPlus = ev.where((e) => (e.layer == EvidenceLayer.natal || e.layer == EvidenceLayer.strength) && e.polarity == Polarity.support).length;
       final natalMinus = ev.where((e) => (e.layer == EvidenceLayer.natal || e.layer == EvidenceLayer.strength) && e.polarity == Polarity.obstruction).length;
@@ -507,17 +688,285 @@ class SynthesisEngine {
       if (dashaOn) statuses.add(PredictionStatus.timingActive);
       if (transitOn) statuses.add(PredictionStatus.transitConfirmed);
       if (vargaOn) statuses.add(PredictionStatus.vargaConfirmed);
-      final layersOn = [statuses.contains(PredictionStatus.natalPromisePresent), dashaOn, transitOn, vargaOn || d.varga == 'D1'];
+      final layersOn = [statuses.contains(PredictionStatus.natalPromisePresent), dashaOn, transitOn, vargaOn || d.vargas.length == 1];
       final agreeing = layersOn.where((x) => x).length;
       if (agreeing >= 2 && agreeing < 4) statuses.add(PredictionStatus.partialConvergence);
       final supportLayers = EvidenceLayer.values.where((l) => ev.any((e) => e.layer == l && e.polarity == Polarity.support && e.tier != SourceTier.systematicSynthesis)).length;
       final tier = supportLayers >= 3 ? SourceTier.multiSourceConvergence : SourceTier.systematicSynthesis;
 
+      final dashaWindows = windows(c, d, dashas, cfg, now);
+      final timing = intersect(d, dashaWindows, dashas, domainTriggers, now, c);
+
+      // Volume 6 status and confidence (§45-46).
+      final insufficient = statuses.contains(PredictionStatus.insufficientData);
+      final contradiction = statuses.contains(PredictionStatus.natalContradiction);
+      final promise = statuses.contains(PredictionStatus.natalPromisePresent);
+      final currentTrigger = domainTriggers.any((t) => t.activeAt(now));
+      final V6Status v6 = insufficient
+          ? V6Status.insufficientData
+          : contradiction
+              ? V6Status.conflicted
+              : natalPlus == 0
+                  ? V6Status.notSupported
+                  : (promise && dashaOn && (transitOn || currentTrigger))
+                      ? V6Status.confirmedByTransit
+                      : (promise && dashaOn)
+                          ? V6Status.activated
+                          : (promise && timing.isNotEmpty)
+                              ? V6Status.timingWindow
+                              : (promise && (layerHasSupport(ev, EvidenceLayer.strength) || vargaOn))
+                                  ? V6Status.supported
+                                  : V6Status.natalPromise;
+      // Layers whose supporting evidence outweighs the obstructing evidence.
+      final netLayers = EvidenceLayer.values.where((l) {
+        final items = ev.where((e) => e.layer == l);
+        return items.where((e) => e.polarity == Polarity.support).length > items.where((e) => e.polarity == Polarity.obstruction).length;
+      }).length;
+      final Confidence confidence = insufficient
+          ? Confidence.insufficient
+          : contradiction
+              ? Confidence.conflicted
+              : (promise && dashaOn && (transitOn || currentTrigger) && netLayers >= 5)
+                  ? Confidence.veryStrong
+                  : (promise && dashaOn && netLayers >= 4)
+                      ? Confidence.strong
+                      : netLayers >= 3
+                          ? Confidence.moderate
+                          : Confidence.low;
+
+      // Master KB dependency template (required layers).
+      String layerState(Iterable<Evidence> xs, {bool applicable = true}) {
+        if (!applicable) return 'NOT_APPLICABLE';
+        final plus = xs.any((e) => e.polarity == Polarity.support), minus = xs.any((e) => e.polarity == Polarity.obstruction);
+        return plus && minus ? 'MIXED' : (plus ? 'SUPPORTING' : (minus ? 'OPPOSING' : 'ABSENT'));
+      }
+
+      final hasConj = conjunctions.any((x) => d.bhavas.contains(x.record.bhava));
+      final dependencies = {
+        'NATAL_PROMISE': layerState(ev.where((e) => e.layer == EvidenceLayer.natal)),
+        'BHAVA_LORD_CHAIN': layerState(ev.where((e) => e.ruleId == 'R001')),
+        'PLANETARY_STRENGTH': layerState(ev.where((e) => e.layer == EvidenceLayer.strength)),
+        'CONJUNCTION_SYNTHESIS': hasConj ? 'PRESENT' : 'NOT_APPLICABLE',
+        'DASHA_ACTIVATION': layerState(ev.where((e) => e.layer == EvidenceLayer.dasha)),
+        'TRANSIT_CONFIRMATION': layerState(ev.where((e) => e.layer == EvidenceLayer.transit), applicable: transit != null),
+      };
+      final required = dependencies.values.where((v) => v != 'NOT_APPLICABLE' && v != 'PRESENT');
+      final masterStatus = insufficient
+          ? 'INSUFFICIENT_INPUT'
+          : (contradiction || (natalPlus == 0 && natalMinus > 0))
+              ? 'CONFLICTED'
+              : required.every((v) => v == 'SUPPORTING' || v == 'MIXED')
+                  ? 'SUPPORTED'
+                  : 'CONDITIONALLY_SUPPORTED';
+
+      // Rule trace and audit counts (§62-63).
+      if (timing.isNotEmpty) rulesRun.add('R022');
+      final fired = {for (final e in ev) e.ruleId};
+      if (timing.isNotEmpty) fired.add('R022');
+      final trace = {for (final r in rulesRun.toList()..sort()) r: fired.contains(r)};
+      final anySupport = ev.any((e) => e.polarity == Polarity.support);
+      final conflictedRules = {for (final e in ev) if (e.polarity == Polarity.obstruction && anySupport) e.ruleId};
+      executed += rulesRun.length;
+      triggered += fired.length;
+      conflicted += conflictedRules.length;
+
       final interpretation = _language(d, agreeing, natalPlus, natalMinus, dashaOn, transitOn, statuses);
-      out.add(DomainSynthesis(d, ev, chains, statuses, tier, interpretation, windows(c, d, dashas, cfg, now), contacts));
+      out.add(DomainSynthesis(d, ev, chains, statuses, tier, interpretation, dashaWindows, contacts,
+          v6Status: v6,
+          confidence: confidence,
+          dependencies: dependencies,
+          masterStatus: masterStatus,
+          triggers: domainTriggers,
+          timingWindows: timing,
+          ruleTrace: trace,
+          graph: _graph(c, d, ev, v6, running, timing)));
     }
 
-    return SynthesisReport(c, out, flags, audit(c, cfg, now), running.map((r) => r.lord).toList());
+    final audit = SynthesisEngine.audit(c, cfg, now)
+      ..['rules_executed'] = '$executed'
+      ..['rules_triggered'] = '$triggered'
+      ..['rules_conflicted'] = '$conflicted';
+    audit['run_id'] = 'RUN-${TimingMath.sha256Of({'inputs': audit['inputs_hash'], 'at': now.toStringAsFixed(5)}).substring(0, 12).toUpperCase()}';
+    return SynthesisReport(c, out, flags, audit, running.map((r) => r.lord).toList(), jaimini: jaimini, sensitivity: sensitivity);
+  }
+
+  static bool layerHasSupport(List<Evidence> ev, EvidenceLayer l) => ev.any((e) => e.layer == l && e.polarity == Polarity.support);
+
+  /// Amatyakaraka for career, Darakaraka and Upapada for marriage, Atmakaraka
+  /// and Arudha Lagna for identity (Jaimini; configurable karaka scheme).
+  static void _jaiminiEvidence(ChartData c, LifeDomain d, JaiminiResult j, Map<String, GrahaRecord> recs,
+      void Function(EvidenceLayer, Polarity, String, SourceTier, String, {String? ruleId}) add, Set<String> rulesRun) {
+    void karaka(String code, int house) {
+      final k = j.karaka(code);
+      if (k == null) return;
+      rulesRun.add('R019');
+      final r = recs[k.planet]!;
+      final h = VedicMath.houseOf(r.rashi, c.lagnaRashi);
+      final link = h == house || housesOwned(c, k.planet).contains(house) || aspectingHouse(c, house, CalcConfig.defaults).contains(k.planet);
+      final good = r.dignity == 'Exalted' || r.dignity == 'Own Sign' || r.dignity == 'Moolatrikona';
+      final bad = r.dignity == 'Debilitated' || r.combust;
+      add(EvidenceLayer.natal, good || (link && !bad) ? Polarity.support : (bad ? Polarity.obstruction : Polarity.neutral),
+          '${k.name} (${k.code}, ${k.signifies}) is ${_n(k.planet)} in the ${VedicMath.ordinal(h)}${link ? ', linked to the ${VedicMath.ordinal(house)}' : ''}'
+          '${good || bad ? ' (${bad ? (r.combust ? 'combust' : 'debilitated') : r.dignity.toLowerCase()})' : ''}.',
+          SourceTier.configurableTradition, 'Jaimini Chara Karaka (${j.scheme}-karaka scheme)', ruleId: 'R019');
+    }
+
+    void pada(ArudhaPada a, String meaning) {
+      rulesRun.add('R020');
+      final lord = VedicMath.rashis[a.rashi].lord;
+      final lr = recs[lord]!;
+      final malefics = [
+        for (final p in ['sun', 'mars', 'saturn', 'rahu', 'ketu'])
+          if (c.planetLongitudes.containsKey(p) && VedicMath.houseOf(VedicMath.rashiIndex(c.planetLongitudes[p]!), a.rashi) == 2) p,
+      ];
+      final benefics = [
+        for (final p in ['jupiter', 'venus', 'mercury'])
+          if (c.planetLongitudes.containsKey(p) && VedicMath.houseOf(VedicMath.rashiIndex(c.planetLongitudes[p]!), a.rashi) == 2) p,
+      ];
+      add(EvidenceLayer.natal, benefics.isNotEmpty && malefics.isEmpty ? Polarity.support : (malefics.isNotEmpty && benefics.isEmpty ? Polarity.obstruction : Polarity.neutral),
+          '${a.name} (${a.code}, $meaning) falls in ${VedicMath.rashis[a.rashi].name}, the ${VedicMath.ordinal(a.fromLagna)} from the Lagna; its lord ${_n(lord)} is in house ${lr.house}'
+          '${benefics.isNotEmpty ? '; benefics ${benefics.map(_n).join(', ')} in the 2nd from it' : ''}${malefics.isNotEmpty ? '; malefics ${malefics.map(_n).join(', ')} in the 2nd from it' : ''}.',
+          SourceTier.classicalDerived, 'Jaimini Arudha / Upapada', ruleId: 'R020');
+    }
+
+    switch (d.id) {
+      case 'career':
+        karaka('AmK', 10);
+      case 'marriage':
+        karaka('DK', 7);
+        pada(j.upapada, 'marriage and its continuity');
+      case 'identity':
+        karaka('AK', 1);
+        pada(j.arudhaLagna, 'public image');
+      case 'children':
+        karaka('PK', 5);
+      case 'home':
+        karaka('MK', 4);
+      case 'skills':
+        karaka('BK', 3);
+      case 'fortune':
+        if (j.scheme == 8) karaka('PiK', 9);
+      case 'spiritual':
+        karaka('AK', 12);
+    }
+  }
+
+  /// Triggers on this domain's factors: lords and karakas of its houses, and
+  /// the cusps of its first two houses.
+  static List<TransitTrigger> triggersFor(ChartData c, LifeDomain d, List<TransitTrigger> all) {
+    final codes = <String>{
+      for (final h in d.bhavas) 'NATAL_${lordOf(c, h).toUpperCase()}',
+      for (final k in d.karakas) 'NATAL_${k.toUpperCase()}',
+      for (final h in d.bhavas.take(2)) 'BHAVA_$h',
+    };
+    return all.where((t) => codes.contains(t.target.code)).toList();
+  }
+
+  /// Daśā windows intersected with transit triggers (Volume 6 §91): each
+  /// exact trigger pass is clipped to the Antardaśā that activates the domain,
+  /// and overlapping passes are merged. The result is a set of windows, not dates.
+  static List<TimingWindow> intersect(LifeDomain d, List<EventWindow> dashaWindows, DashaCalculations dashas, List<TransitTrigger> triggers, double now, ChartData c) {
+    final out = <TimingWindow>[];
+    final exact = triggers.where((t) => t.exactJds.isNotEmpty && t.exitJd > now).toList()..sort((a, b) => a.enterJd.compareTo(b.enterJd));
+    for (final w in dashaWindows) {
+      final lo = w.startJd > now ? w.startJd : now;
+      final hits = exact.where((t) => t.enterJd < w.endJd && t.exitJd > lo).toList();
+      if (hits.isEmpty) continue;
+      final md = dashas.runningAt((w.startJd + w.endJd) / 2);
+      if (md.length < 2) continue;
+      // Merge overlapping passes.
+      final groups = <List<TransitTrigger>>[];
+      double groupEnd = -1;
+      for (final t in hits) {
+        if (groups.isEmpty || t.enterJd > groupEnd) {
+          groups.add([t]);
+          groupEnd = t.exitJd;
+        } else {
+          groups.last.add(t);
+          if (t.exitJd > groupEnd) groupEnd = t.exitJd;
+        }
+      }
+      for (final g in groups) {
+        final first = g.map((t) => t.enterJd).reduce((a, b) => a < b ? a : b);
+        final last = g.map((t) => t.exitJd).reduce((a, b) => a > b ? a : b);
+        final s = first > lo ? first : lo;
+        final e = last < w.endJd ? last : w.endJd;
+        if (e <= s) continue;
+        final current = s <= now && now <= e && g.any((t) => t.activeAt(now));
+        out.add(TimingWindow(
+          d.v6Name,
+          s,
+          e,
+          VedicMath.jdToDate(s + c.utcOffset / 24),
+          VedicMath.jdToDate(e + c.utcOffset / 24),
+          ['${md[0].lord.toUpperCase()}_MD', '${md[1].lord.toUpperCase()}_AD', ...{for (final t in g) t.tag}],
+          current ? 'CONFIRMED_BY_TRANSIT' : 'TIMING_WINDOW',
+          g,
+        ));
+      }
+    }
+    out.sort((a, b) => a.startJd.compareTo(b.startJd));
+    return out;
+  }
+
+  /// Explanation graph: prediction → event → layer → evidence → rule → source,
+  /// with planets, houses, Daśā lords and triggers as linked nodes.
+  static ExplanationGraph _graph(ChartData c, LifeDomain d, List<Evidence> ev, V6Status status, List<DashaPeriod> running, List<TimingWindow> timing) {
+    final g = ExplanationGraph();
+    final pred = 'PRED:${d.code}';
+    final event = 'EVENT:${d.code}';
+    g.node(pred, 'Prediction', '${d.v6Name}: ${status.code}');
+    g.node(event, 'Event', d.name);
+    g.edge(pred, event, 'APPLIES_TO');
+    for (final h in d.bhavas) {
+      g.node('HOUSE:$h', 'House', '${VedicMath.ordinal(h)} house');
+      g.edge(event, 'HOUSE:$h', 'JUDGED_FROM');
+      final lord = lordOf(c, h);
+      g.node('PLANET:${lord.toUpperCase()}', 'Planet', _n(lord));
+      g.edge('PLANET:${lord.toUpperCase()}', 'HOUSE:$h', 'LORDS');
+    }
+    final levels = ['MD', 'AD', 'PD', 'SD'];
+    for (int i = 0; i < running.length && i < 2; i++) {
+      final id = 'DASHA:${levels[i]}:${running[i].lord.toUpperCase()}';
+      g.node(id, 'Dasha', '${levels[i]} ${_n(running[i].lord)}');
+      g.node('PLANET:${running[i].lord.toUpperCase()}', 'Planet', _n(running[i].lord));
+      g.edge(id, event, 'ACTIVATES');
+      g.edge('PLANET:${running[i].lord.toUpperCase()}', id, 'LORDS');
+    }
+    for (final l in EvidenceLayer.values) {
+      final items = ev.where((e) => e.layer == l).toList();
+      if (items.isEmpty) continue;
+      final lid = 'LAYER:${d.code}:${l.level}';
+      g.node(lid, 'Layer', l.label);
+      g.edge(event, lid, 'EVIDENCE_LAYER');
+      for (final e in items) {
+        final eid = 'EV:${e.id}';
+        g.node(eid, 'Evidence', '${e.mark} ${e.text}');
+        g.edge(lid, eid, 'CONTAINS');
+        g.edge(eid, event, switch (e.polarity) { Polarity.support => 'SUPPORTS', Polarity.obstruction => 'CONFLICTS_WITH', Polarity.neutral => 'MODIFIES' });
+        final rule = KnowledgeRegistry.rule(e.ruleId);
+        g.node('RULE:${rule.id}', 'Rule', '${rule.id} ${rule.name}');
+        g.edge(eid, 'RULE:${rule.id}', 'DERIVED_FROM');
+        for (final s in rule.sourceIds) {
+          g.node('SRC:$s', 'Source', KnowledgeRegistry.sourceLabel(s));
+          g.edge('RULE:${rule.id}', 'SRC:$s', 'SUPPORTED_BY');
+        }
+        for (final p in Ephemeris.planetOrder) {
+          if (e.text.contains(_n(p)) && g.nodes.containsKey('PLANET:${p.toUpperCase()}')) g.edge(eid, 'PLANET:${p.toUpperCase()}', 'APPLIES_TO');
+        }
+      }
+    }
+    for (final w in timing.take(5)) {
+      final wid = 'WINDOW:${d.code}:${w.start}';
+      g.node(wid, 'TimingWindow', '${w.start} – ${w.end} ${w.activation.join(', ')}');
+      g.edge(pred, wid, 'HAS_WINDOW');
+      for (final t in w.triggers) {
+        final tid = 'TRIGGER:${t.tag}:${t.enterDate}';
+        g.node(tid, 'Transit', t.summary);
+        g.edge(tid, wid, 'TRIGGERS');
+      }
+    }
+    return g;
   }
 
   /// Evidence-calibrated wording (Volume 5 §35); never deterministic.
@@ -627,6 +1076,9 @@ class SynthesisEngine {
   /// Audit log (Volume 5 §44): everything needed to reproduce the result.
   static Map<String, String> audit(ChartData c, CalcConfig cfg, double now) => {
         'engine_version': CalcConfig.engineVersion,
+        'knowledge_registry_version': KnowledgeRegistry.version,
+        'inputs_hash': TimingMath.inputsHash(c, cfg),
+        'calculation_hash': TimingMath.calculationHash(c),
         'source_versions': sourceVersions,
         'ephemeris': Ephemeris.ephemerisLabel,
         'ayanamsha': '${Ephemeris.ayanamsaLabel}; value ${c.ayanamsa.toStringAsFixed(6)}°',
@@ -634,7 +1086,7 @@ class SynthesisEngine {
         ...cfg.ruleVersions,
         'input_birth_data': 'JD(UT) ${c.jd.toStringAsFixed(6)}, lat ${c.lat.toStringAsFixed(4)}, lon ${c.lon.toStringAsFixed(4)}, UTC offset ${c.utcOffset}',
         'calculation_timestamp': Ephemeris.jdToUtc(now).toIso8601String(),
-        'dasha_convention': 'Vimshottari, 365.25-day years, Moon nakshatra balance',
+        'dasha_convention': 'Vimshottari, ${DashaCalculations.yearDays}-day years, Moon nakshatra balance',
       };
 
   // ---------------------------------------------------------------------------

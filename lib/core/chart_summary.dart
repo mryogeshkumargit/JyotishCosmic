@@ -1,4 +1,5 @@
 import 'ephemeris.dart';
+import 'jaimini_math.dart';
 import 'planetary_dignity.dart';
 import 'vedic_math.dart';
 import 'yogas_math.dart';
@@ -23,7 +24,7 @@ class ChartSummary {
     final ascNak = VedicMath.nakshatras[VedicMath.nakshatraIndex(asc)];
     final buf = StringBuffer();
     if (name != null) buf.writeln('Native: $name');
-    buf.writeln('Sidereal zodiac, Lahiri ayanamsa ${chart.ayanamsa.toStringAsFixed(4)}°, whole-sign houses.');
+    buf.writeln('Sidereal zodiac, ${Ephemeris.ayanamsaLabel.split(';').first} ayanamsa ${chart.ayanamsa.toStringAsFixed(4)}°, ${Ephemeris.nodeModel.toLowerCase()}, whole-sign houses.');
     buf.writeln('Ascendant (Lagna): ${VedicMath.rashis[chart.lagnaRashi].name} ${VedicMath.formatDegree(asc)}, '
         '${ascNak.name} pada ${VedicMath.pada(asc)}');
     for (final p in Ephemeris.planetOrder) {
@@ -42,6 +43,12 @@ class ChartSummary {
     try {
       final sb = ShadbalaMath.compute(chart);
       buf.writeln('Shadbala (rupas, ratio to BPHS minimum): ${sb.ranked.map((s) => '${s.name} ${s.rupas.toStringAsFixed(2)} (${s.ratio.toStringAsFixed(2)}x)').join(', ')}');
+    } catch (_) {}
+    try {
+      final j = JaiminiMath.compute(chart);
+      String n(String p) => VedicMath.planets[p]!.name;
+      buf.writeln('Jaimini (8 Chara Karakas): ${j.karakas.map((k) => '${k.code} ${n(k.planet)}').join(', ')}; '
+          'Arudha Lagna ${VedicMath.rashis[j.arudhaLagna.rashi].name}, Upapada ${VedicMath.rashis[j.upapada.rashi].name}, Karakamsa ${VedicMath.rashis[j.karakamsa].name}');
     } catch (_) {}
     final yogas = YogasMath.forChart(chart).where((y) => y.formed && y.strength != 'Secondary').toList();
     if (yogas.isNotEmpty) {

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../widgets/yoga_guide_view.dart';
+import 'research_screen.dart';
+import 'rules_sources_screen.dart';
 
 /// The bundled research documents (Vedic Knowledge Base).
 class KnowledgeBaseScreen extends StatelessWidget {
@@ -10,6 +12,10 @@ class KnowledgeBaseScreen extends StatelessWidget {
     ('Conjunction Database — Volume 2', '21 pairs × Bhāva × Rāśi × Lagna', 'assets/docs/conjunction_db_vol2.md'),
     ('Conjunction Database — Volume 4', 'Degree, strength, Varga, aspect and Daśā engine', 'assets/docs/conjunction_db_vol4.md'),
     ('Conjunction Database — Volume 5', 'Predictive synthesis engine', 'assets/docs/conjunction_db_vol5.md'),
+    ('Conjunction Database — Volume 6', 'Automated chart interpreter and prediction API', 'assets/docs/conjunction_db_vol6.md'),
+    ('Planetary Conjunctions — Deep Research', 'Pair × Bhāva × Rāśi × Lagna, with common errors', 'assets/docs/conjunctions_deep_research.md'),
+    ('Master Knowledge Base v1.0.0', 'Five-layer architecture and external sources', 'assets/docs/master_kb_readme.md'),
+    ('Production Knowledge Graph v1.0.0', 'Ontology, provenance, evidence and prediction model', 'assets/docs/production_knowledge_graph.md'),
   ];
 
   @override
@@ -35,6 +41,24 @@ class KnowledgeBaseScreen extends StatelessWidget {
                 ),
               ),
             ),
+          Card(
+            child: ListTile(
+              leading: Icon(Icons.rule, color: scheme.primary),
+              title: const Text('Rules & Sources', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: const Text('Rule registry, classical source records and the coverage report'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RulesSourcesScreen())),
+            ),
+          ),
+          Card(
+            child: ListTile(
+              leading: Icon(Icons.query_stats, color: scheme.primary),
+              title: const Text('Research', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: const Text('Find a conjunction by house, sign, Daśā or D9 across saved charts'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ResearchScreen())),
+            ),
+          ),
           Card(
             child: ListTile(
               leading: Icon(Icons.storage, color: scheme.secondary),

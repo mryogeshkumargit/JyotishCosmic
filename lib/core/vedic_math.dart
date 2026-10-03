@@ -263,8 +263,11 @@ class DashaPeriod {
 
 /// Vimshottari dasha (Mahadasha > Antardasha > Pratyantardasha).
 class DashaCalculations {
-  /// Days per dasha year.
-  static const double yearDays = 365.25;
+  /// Days per dasha year (365.25 by default; 365.2425 is configurable).
+  static double yearDays = 365.25;
+
+  /// Default levels computed: 3 = Pratyantardasha (4 = Sookshma on request).
+  static int depth = 3;
 
   final List<DashaPeriod> mahadashas;
 
@@ -272,7 +275,7 @@ class DashaCalculations {
 
   /// [birthJD] is the UT Julian day of birth, [moonSid] the sidereal Moon.
   /// Dates are labelled in local time using [utcOffset] (hours).
-  static DashaCalculations compute(double birthJD, double moonSid, {double utcOffset = 0}) {
+  static DashaCalculations compute(double birthJD, double moonSid, {double utcOffset = 0, int? levels}) {
     final int ni = VedicMath.nakshatraIndex(moonSid);
     final String startLord = VedicMath.nakshatraLord[ni];
     const double nakSpan = 360 / 27;
@@ -282,7 +285,7 @@ class DashaCalculations {
     // theoretical start and clip everything that ended before birth. This keeps
     // antar/pratyantar boundaries exact inside the partial first Mahadasha.
     final double cycleStart = birthJD - fracElapsed * VedicMath.dashaYears[startLord]! * yearDays;
-    return DashaCalculations(_periods(startLord, cycleStart, 120, 3, birthJD, utcOffset));
+    return DashaCalculations(_periods(startLord, cycleStart, 120, levels ?? depth, birthJD, utcOffset));
   }
 
   static List<DashaPeriod> _periods(

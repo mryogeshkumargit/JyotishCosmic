@@ -5,13 +5,14 @@ import 'ephemeris.dart';
 import 'planetary_dignity.dart';
 import 'vedic_math.dart';
 
-/// Evidence / status flags (Volume 4 §26, Volume 5 §3).
+/// Evidence classes (Volume 4 §26, Volume 5 §3, Volume 6 §17).
 enum SourceTier {
-  classicalDirect('CLASSICAL_DIRECT', 'Exact classical rule'),
+  classicalDirect('DIRECT_CLASSICAL', 'Exact classical rule'),
   classicalDerived('CLASSICAL_DERIVED', 'Direct calculation from a classical method'),
   multiSourceConvergence('MULTI_SOURCE_CONVERGENCE', 'Several classical rules agree'),
   configurableTradition('CONFIGURABLE_TRADITION', 'Depends on a configurable convention'),
   systematicSynthesis('SYSTEMATIC_SYNTHESIS', 'Database synthesis, not a quoted classical rule'),
+  engineeringHeuristic('ENGINEERING_HEURISTIC', 'Software heuristic for ranking or display; not a classical rule'),
   insufficientInput('INSUFFICIENT_INPUT', 'Required data missing');
 
   final String code;

@@ -262,6 +262,62 @@ class ConjunctionDb {
   static const int totalRecords = 120 * 12 * 12;
 
   // ---------------------------------------------------------------------------
+  // Deep Research additions (Planetary Conjunctions Deep Research, §3, §6, §12, §17, §19)
+  // ---------------------------------------------------------------------------
+
+  /// Dominant modifier of each Rashi (Deep Research §6).
+  static const List<String> signModifiers = [
+    'initiative', 'resources and stability', 'communication and learning', 'care and emotion', 'authority and creativity',
+    'analysis and service', 'partnership and negotiation', 'depth and transformation', 'learning and expansion',
+    'structure and career', 'systems and groups', 'imagination and synthesis',
+  ];
+
+  /// Modern-neutral summaries of the Phaladeepika ch. 18 pair results (Deep Research §3).
+  static const Map<String, String> classicalObservations = {
+    'sun-moon': 'identity and emotional mind become closely linked.',
+    'sun-mars': 'authority, courage and action combine; the classical literature gives an energetic/forceful interpretation.',
+    'sun-mercury': 'intellect, communication and administration; this is the basis of the commonly named Budha-Āditya combination, but the conjunction alone does not establish an exceptional result.',
+    'sun-jupiter': 'authority, learning, counsel and principles.',
+    'sun-venus': 'visibility, aesthetics, relationships and creative/luxury themes.',
+    'sun-saturn': 'authority, duty, endurance and institutional structure.',
+    'moon-mars': 'enterprise, initiative and emotional heat; associated with the Chandra-Maṅgala framework.',
+    'moon-mercury': 'learning, speech, interpretation and adaptability.',
+    'moon-jupiter': 'nurturing, learning, counsel and support; Gaja-Kesari is more specifically a Kendra relationship of Jupiter to Moon.',
+    'moon-venus': 'aesthetics, relationships, comfort and artistic feeling.',
+    'moon-saturn': 'responsibility, seriousness and endurance.',
+    'mars-mercury': 'technical reasoning, strategy, debate, engineering/trading-type themes.',
+    'mars-jupiter': 'leadership, initiative and strategic action guided by principles.',
+    'mars-venus': 'passion, creativity, competition and desire.',
+    'mars-saturn': 'force plus restraint; persistence, engineering and pressure tolerance.',
+    'mercury-jupiter': 'scholarship, writing, advising, finance/law-type reasoning.',
+    'mercury-venus': 'language, literature, design, music, negotiation and commerce.',
+    'mercury-saturn': 'systems, calculation, technical work and disciplined communication.',
+    'jupiter-venus': 'learning, wealth, arts and relationships; possible tension between principle and pleasure.',
+    'jupiter-saturn': 'expansion plus structure; long-term planning and institution-building.',
+    'venus-saturn': 'craftsmanship, disciplined creativity, durable resources and serious relationship expectations.',
+  };
+
+  static String classicalObservation(String a, String b) {
+    final c = canonical([a, b]);
+    return classicalObservations['${c[0]}-${c[1]}']!;
+  }
+
+  /// Deep Research §7: pair x Rashi with the sign's dominant modifier.
+  static String pairSignModifierText(String a, String b, int rashi) =>
+      '${pairTheme(a, b)}; expressed through ${signModifiers[rashi]}. The condition of ${planetName(VedicMath.rashis[rashi].lord)}, the dispositor, becomes decisive.';
+
+  /// Vargas (from [vargas]) in which every planet of [planets] shares one sign (Deep Research §17).
+  static List<String> vargaRepetition(ChartData chart, List<String> planets, List<String> vargas) {
+    final out = <String>[];
+    for (final v in vargas) {
+      final div = VedicMath.vargaDefs.firstWhere((d) => d.key == v).div;
+      final signs = {for (final p in planets) VedicMath.vargaRashi(chart.planetLongitudes[p]!, v, div)};
+      if (signs.length == 1) out.add(v);
+    }
+    return out;
+  }
+
+  // ---------------------------------------------------------------------------
   // Chart analysis
   // ---------------------------------------------------------------------------
 
@@ -336,6 +392,40 @@ class ChartConjunction {
   late final Map<String, GrahaRecord> grahas = {for (final p in record.planets) p: PrecisionMath.record(chart, p, cfg)};
   late final GrahaRecord dispositorRecord = PrecisionMath.record(chart, record.dispositor, cfg);
 
+  late final ClusterDiagnostics diagnostics = ClusterDiagnostics.of(this);
+
+  String get signModifier => ConjunctionDb.signModifiers[record.rashi];
+
+  /// Phaladeepika ch. 18 pair summaries for every pair in the cluster.
+  List<(String, String)> get classicalObservations => [
+        for (final (a, b) in record.pairs) ('${ConjunctionDb.planetName(a)}–${ConjunctionDb.planetName(b)}', ConjunctionDb.classicalObservation(a, b)),
+      ];
+
+  /// D9 and D10 repetition of the whole cluster, then of each pair (Deep Research §17).
+  late final List<String> vargaRepetition = ConjunctionDb.vargaRepetition(chart, record.planets, const ['D9', 'D10']);
+  late final List<String> pairRepetitions = [
+    for (final (a, b) in record.pairs)
+      for (final v in ConjunctionDb.vargaRepetition(chart, [a, b], const ['D9', 'D10'])) '${ConjunctionDb.planetName(a)}–${ConjunctionDb.planetName(b)} in $v',
+  ];
+
+  /// Common-error cautions that apply to this cluster (Deep Research §12, §19).
+  List<String> get cautions {
+    final out = <String>[];
+    final ps = record.planets;
+    if (ps.contains('moon') && ps.contains('jupiter')) {
+      out.add('Moon–Jupiter in one sign is not by itself Gaja-Kesari: that yoga is defined by Jupiter in a Kendra from the Moon and needs strength.');
+    }
+    if (ps.contains('sun') && ps.contains('mercury')) {
+      final e = edges.firstWhere((e) => {e.a, e.b}.containsAll(['sun', 'mercury']));
+      out.add('Sun–Mercury (${e.separation.toStringAsFixed(1)}° apart${grahas['mercury']!.combust ? ', Mercury combust' : ''}) is not automatically an exceptional Budha-Āditya result; check degree, combustion, dignity, house and dispositor.');
+    }
+    if (ps.contains('sun') && ps.any((p) => p != 'sun' && p != 'moon' && grahas[p]!.combust)) {
+      out.add('Same-sign is not the same as close: ${ps.where((p) => p != 'sun' && p != 'moon' && grahas[p]!.combust).map(ConjunctionDb.planetName).join(', ')} is combust and judged with that modifier.');
+    }
+    if (ps.length >= 3) out.add('${ps.length} planets give ${ps.length * (ps.length - 1) ~/ 2} pair relationships; read the dominant planet, dispositor and closest pair before the full list.');
+    return out;
+  }
+
   PairEdge? get closestPair => edges.isEmpty ? null : (List.of(edges)..sort((a, b) => a.separation.compareTo(b.separation))).first;
 
   /// The planet with the strongest sign dignity (ties: the one closest to the cluster centre).
@@ -397,6 +487,121 @@ class ChartConjunction {
     }
     return out;
   }
+}
+
+/// Volume 6 §17-18 cluster compression. These values are engineering
+/// diagnostics (ENGINEERING_HEURISTIC), not classical scores.
+class ClusterDiagnostics {
+  final int size;
+  final int pairEdges;
+  final double degreeSpan;
+  final double centerLongitude;
+  final PairEdge? nearestPair;
+  final PairEdge? widestPair;
+  final String centralPlanet;
+  final String dominantDignity;
+  final int combustCount;
+  final int retrogradeCount;
+  final List<String> nodes;
+  final double compactness;
+  final double dignityCoherence;
+  final double houseCoherence;
+  final double activationPotential;
+  const ClusterDiagnostics(this.size, this.pairEdges, this.degreeSpan, this.centerLongitude, this.nearestPair, this.widestPair, this.centralPlanet,
+      this.dominantDignity, this.combustCount, this.retrogradeCount, this.nodes, this.compactness, this.dignityCoherence, this.houseCoherence,
+      this.activationPotential);
+
+  static const String classification = 'ENGINEERING_HEURISTIC';
+
+  static String dignityClass(String d) => switch (d) {
+        'Exalted' || 'Moolatrikona' || 'Own Sign' => 'strong',
+        'Debilitated' => 'weak',
+        final x when x.contains('Enemy') => 'weak',
+        _ => 'neutral',
+      };
+
+  /// Smallest arc containing all [longitudes] and its midpoint.
+  static (double, double) arc(List<double> longitudes) {
+    final ls = [for (final l in longitudes) VedicMath.norm360(l)]..sort();
+    if (ls.length < 2) return (0, ls.isEmpty ? 0 : ls.first);
+    var gap = 360 - ls.last + ls.first;
+    var startIdx = 0;
+    for (int i = 1; i < ls.length; i++) {
+      if (ls[i] - ls[i - 1] > gap) {
+        gap = ls[i] - ls[i - 1];
+        startIdx = i;
+      }
+    }
+    final span = 360 - gap;
+    return (span, VedicMath.norm360(ls[startIdx] + span / 2));
+  }
+
+  factory ClusterDiagnostics.of(ChartConjunction cj) {
+    final c = cj.chart;
+    final ps = cj.record.planets;
+    final (span, center) = arc([for (final p in ps) c.planetLongitudes[p]!]);
+    final sorted = List.of(cj.edges)..sort((a, b) => a.separation.compareTo(b.separation));
+    String central = ps.first;
+    double best = double.infinity;
+    for (final p in ps) {
+      final sum = ps.fold<double>(0, (s, q) => s + PrecisionMath.separation(c.planetLongitudes[p]!, c.planetLongitudes[q]!));
+      if (sum < best) {
+        best = sum;
+        central = p;
+      }
+    }
+    final classes = [for (final p in ps) dignityClass(cj.grahas[p]!.dignity)];
+    final counts = <String, int>{};
+    for (final k in classes) {
+      counts[k] = (counts[k] ?? 0) + 1;
+    }
+    final top = counts.entries.reduce((a, b) => b.value > a.value ? b : a);
+    // Equal houses from the ascendant degree: whole-sign members can straddle a Bhava cusp.
+    final eqHouses = [for (final p in ps) (VedicMath.norm360(c.planetLongitudes[p]! - c.ascendantSidereal + 15) / 30).floor() % 12];
+    final hc = <int, int>{};
+    for (final h in eqHouses) {
+      hc[h] = (hc[h] ?? 0) + 1;
+    }
+    final levels = cj.activeNow.map((s) => s.split(' ').first).toSet().length;
+    return ClusterDiagnostics(
+      ps.length,
+      cj.edges.length,
+      span,
+      center,
+      sorted.isEmpty ? null : sorted.first,
+      sorted.isEmpty ? null : sorted.last,
+      central,
+      top.key,
+      ps.where((p) => cj.grahas[p]!.combust).length,
+      ps.where((p) => cj.grahas[p]!.retrograde).length,
+      cj.nodes,
+      (1 - span / 30).clamp(0.0, 1.0),
+      top.value / ps.length,
+      hc.values.reduce((a, b) => a > b ? a : b) / ps.length,
+      cj.runningLords.isEmpty ? 0 : levels / cj.runningLords.length.clamp(1, 3),
+    );
+  }
+
+  Map<String, Object?> toJson() => {
+        'classification': classification,
+        'size': size,
+        'pair_edges': pairEdges,
+        'degree_span': double.parse(degreeSpan.toStringAsFixed(3)),
+        'center_longitude': double.parse(centerLongitude.toStringAsFixed(2)),
+        'nearest_pair': nearestPair == null ? null : '${nearestPair!.a}-${nearestPair!.b}',
+        'widest_pair': widestPair == null ? null : '${widestPair!.a}-${widestPair!.b}',
+        'central_planet': centralPlanet,
+        'dominant_dignity': dominantDignity,
+        'combust': combustCount,
+        'retrograde': retrogradeCount,
+        'nodes': nodes,
+        'cluster_strength': {
+          'compactness': double.parse(compactness.toStringAsFixed(2)),
+          'dignity_coherence': double.parse(dignityCoherence.toStringAsFixed(2)),
+          'house_coherence': double.parse(houseCoherence.toStringAsFixed(2)),
+          'activation_potential': double.parse(activationPotential.toStringAsFixed(2)),
+        },
+      };
 }
 
 class NodeAssociation {

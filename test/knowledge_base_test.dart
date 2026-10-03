@@ -150,7 +150,7 @@ void main() {
       expect(r.domains.length, SynthesisEngine.domains.length);
       for (final d in r.domains) {
         expect(d.evidence, isNotEmpty, reason: d.domain.id);
-        expect(d.evidence.map((e) => e.id).toList(), [for (int i = 1; i <= d.evidence.length; i++) 'R$i']);
+        expect(d.evidence.map((e) => e.id).toList(), [for (int i = 1; i <= d.evidence.length; i++) '${d.domain.code}-EV$i']);
         expect(d.statuses, isNotEmpty);
         expect(d.lordChains.length, d.domain.bhavas.length);
         expect(d.interpretation, isNot(contains('definitely')));

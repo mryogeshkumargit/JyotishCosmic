@@ -14,7 +14,12 @@ import 'package:mobile_jyotish/screens/kundli_result_screen.dart';
 import 'package:mobile_jyotish/screens/knowledge_base_screen.dart';
 import 'package:mobile_jyotish/screens/rashifal_screen.dart';
 import 'package:mobile_jyotish/screens/report_screen.dart';
+import 'package:mobile_jyotish/screens/research_screen.dart';
+import 'package:mobile_jyotish/screens/rules_sources_screen.dart';
 import 'package:mobile_jyotish/screens/settings_screen.dart';
+import 'package:mobile_jyotish/screens/tabs/synthesis_screen.dart';
+import 'package:mobile_jyotish/core/ephemeris.dart';
+import 'package:mobile_jyotish/core/synthesis_engine.dart';
 import 'package:mobile_jyotish/theme/app_theme.dart';
 import 'package:mobile_jyotish/widgets/yoga_guide_view.dart';
 
@@ -100,6 +105,8 @@ void main() {
           'report': const ReportScreen(),
           'settings': const SettingsScreen(),
           'knowledge base': const KnowledgeBaseScreen(),
+          'rules & sources': const RulesSourcesScreen(),
+          'research': const ResearchScreen(),
         };
         final failures = <String>[];
         for (final e in screens.entries) {
@@ -111,6 +118,20 @@ void main() {
                 await tester.tap(find.text(t));
                 await settle(tester);
               }
+            }
+            if (e.key == 'rules & sources') {
+              for (final t in ['Sources', 'Coverage']) {
+                await tester.tap(find.text(t));
+                await settle(tester);
+              }
+            }
+            if (e.key == 'research' && swephSkipReason() == null) {
+              final search = find.text('Search saved charts');
+              await tester.scrollUntilVisible(search, 200, scrollable: find.byType(Scrollable).first);
+              await tester.tap(search);
+              await settle(tester);
+              await tester.drag(find.byType(Scrollable).first, const Offset(0, -3000));
+              await settle(tester);
             }
             if (e.key == 'dashboard') {
               await tester.tap(find.text('Ask AI'));
@@ -136,6 +157,30 @@ void main() {
         await tester.runAsync(db.close);
         expect(failures, isEmpty, reason: failures.join('\n'));
       });
+
+      testWidgets('synthesis domain details fit $tag', (tester) async {
+        await tester.binding.setSurfaceSize(size);
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final db = AppDatabase.forTesting(NativeDatabase.memory());
+        final c = Ephemeris.computeChart(1990, 6, 15, 14, 30, 19.07, 72.88, 5.5);
+        final report = SynthesisEngine.analyse(c, atJd: Ephemeris.julianDay(2026, 10, 3));
+        final failures = <String>[];
+        for (final d in report.domains) {
+          final errors = await collect(tester, () async {
+            await tester.pumpWidget(app(DomainDetailScreen(key: ValueKey(d.domain.id), report: report, domain: d, name: 'Asha'), db, scale));
+            await settle(tester);
+            for (int i = 0; i < 6; i++) {
+              await tester.drag(find.byType(Scrollable).first, const Offset(0, -1500));
+              await settle(tester);
+            }
+          });
+          failures.addAll(errors.map((m) => '${d.domain.id}: $m'));
+        }
+        await tester.pumpWidget(const SizedBox());
+        await settle(tester);
+        await tester.runAsync(db.close);
+        expect(failures, isEmpty, reason: failures.join('\n'));
+      }, skip: swephSkipReason() != null);
 
       testWidgets('chart features fit $tag', (tester) async {
         await tester.binding.setSurfaceSize(size);
@@ -174,6 +219,12 @@ void main() {
             final tabs = find.byType(Tab);
             for (int i = 0; i < tabs.evaluate().length; i++) {
               await tester.tap(tabs.at(i), warnIfMissed: false);
+              await settle(tester);
+            }
+            if (f == 'Synthesis') {
+              await tester.tap(tabs.at(0), warnIfMissed: false);
+              await settle(tester);
+              await tester.tap(find.text('Jaimini karakas & Arudhas'));
               await settle(tester);
             }
           });

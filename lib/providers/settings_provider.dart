@@ -135,6 +135,11 @@ class SettingsNotifier extends Notifier<SettingsState> {
       final wr = values['calc_warRule'];
       final orb = double.tryParse(values['calc_closeOrb'] ?? '');
       calc = calc.copyWith(
+        ayanamsa: values['calc_ayanamsa'],
+        trueNode: values['calc_trueNode'] == null ? null : values['calc_trueNode'] == 'true',
+        dashaYearDays: double.tryParse(values['calc_dashaYear'] ?? ''),
+        karakaScheme: int.tryParse(values['calc_karakas'] ?? ''),
+        transitOrb: double.tryParse(values['calc_transitOrb'] ?? ''),
         nodeAspects: NodeAspectRule.values.where((v) => v.name == na).firstOrNull,
         warRule: WarRule.values.where((v) => v.name == wr).firstOrNull,
         closeConjunctionOrb: orb,
@@ -182,6 +187,11 @@ class SettingsNotifier extends Notifier<SettingsState> {
       await _storage.write(key: 'calc_nodeAspects', value: calc.nodeAspects.name);
       await _storage.write(key: 'calc_warRule', value: calc.warRule.name);
       await _storage.write(key: 'calc_closeOrb', value: calc.closeConjunctionOrb.toString());
+      await _storage.write(key: 'calc_ayanamsa', value: calc.ayanamsa);
+      await _storage.write(key: 'calc_trueNode', value: calc.trueNode.toString());
+      await _storage.write(key: 'calc_dashaYear', value: calc.dashaYearDays.toString());
+      await _storage.write(key: 'calc_karakas', value: calc.karakaScheme.toString());
+      await _storage.write(key: 'calc_transitOrb', value: calc.transitOrb.toString());
     } catch (_) {}
   }
 

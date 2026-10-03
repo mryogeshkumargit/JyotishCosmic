@@ -6,15 +6,31 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/calc_config.dart';
 import '../../core/chart_summary.dart';
 import '../../core/ephemeris.dart';
+import '../../core/knowledge_registry.dart';
 import '../../core/synthesis_engine.dart';
+import '../../core/timing_math.dart';
 import '../../core/vedic_math.dart';
 import '../../providers/settings_provider.dart';
+import '../../services/pdf_service.dart';
 import '../../widgets/ai_sheet.dart';
 import '../../widgets/analysis_widgets.dart';
 
 Color _statusColor(PredictionStatus s, ColorScheme scheme) => switch (s) {
       PredictionStatus.natalContradiction || PredictionStatus.insufficientData => scheme.error,
       PredictionStatus.natalPromiseWeak || PredictionStatus.partialConvergence => Colors.orange,
+      _ => Colors.green,
+    };
+
+Color _v6Color(V6Status s, ColorScheme scheme) => switch (s) {
+      V6Status.conflicted || V6Status.insufficientData || V6Status.notSupported => scheme.error,
+      V6Status.natalPromise || V6Status.supported => Colors.orange,
+      _ => Colors.green,
+    };
+
+Color _confColor(Confidence c, ColorScheme scheme) => switch (c) {
+      Confidence.conflicted || Confidence.insufficient => scheme.error,
+      Confidence.low => scheme.outline,
+      Confidence.moderate => Colors.orange,
       _ => Colors.green,
     };
 
@@ -48,16 +64,17 @@ class _SynthesisScreenState extends ConsumerState<SynthesisScreen> {
       _report = SynthesisEngine.analyse(widget.chartData, cfg: cfg);
     }
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Synthesis'),
-          bottom: const TabBar(tabs: [Tab(text: 'Domains'), Tab(text: 'Rectify'), Tab(text: 'Audit')]),
+          bottom: const TabBar(tabs: [Tab(text: 'Domains'), Tab(text: 'Timing'), Tab(text: 'Rectify'), Tab(text: 'Audit')]),
         ),
         body: TabBarView(children: [
           _DomainsTab(report: _report, profileId: widget.profileId, name: widget.name),
-          _RectifyTab(chart: widget.chartData, cfg: cfg),
-          _AuditTab(report: _report),
+          _TimingTab(report: _report),
+          _RectifyTab(chart: widget.chartData, cfg: cfg, sensitivity: _report.sensitivity),
+          _AuditTab(report: _report, name: widget.name),
         ]),
       ),
     );
@@ -108,6 +125,7 @@ class _DomainsTab extends StatelessWidget {
         for (final f in report.inputFlags.where((f) => f.severity != 'info'))
           BulletLine(f.message, mark: '⚠', color: f.severity == 'critical' ? scheme.error : Colors.orange),
         const SizedBox(height: 8),
+        if (report.jaimini != null) _JaiminiCard(report),
         for (final d in report.domains)
           Card(
             margin: const EdgeInsets.only(bottom: 8),
@@ -118,13 +136,15 @@ class _DomainsTab extends StatelessWidget {
                 padding: const EdgeInsets.all(12),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Row(children: [
-                    Expanded(child: Text(d.domain.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15))),
+                    Expanded(child: Text('${d.domain.code} · ${d.domain.name}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15))),
                     const Icon(Icons.chevron_right),
                   ]),
                   const SizedBox(height: 4),
                   Wrap(spacing: 6, runSpacing: 4, children: [
+                    Pill(d.v6Status.code, _v6Color(d.v6Status, scheme)),
+                    Pill(d.confidence.code, _confColor(d.confidence, scheme)),
                     Pill(d.primaryStatus.code, _statusColor(d.primaryStatus, scheme)),
-                    if (d.statuses.contains(PredictionStatus.timingActive)) Pill('TIMING_ACTIVE', scheme.primary),
+                    if (d.timingWindows.isNotEmpty) Pill('${d.timingWindows.length} WINDOW${d.timingWindows.length == 1 ? '' : 'S'}', scheme.primary),
                   ]),
                   const SizedBox(height: 6),
                   _LayerStrip(d),
@@ -169,7 +189,7 @@ class DomainDetailScreen extends ConsumerWidget {
         children: [
           SectionCard(
             title: 'Result',
-            subtitle: 'Houses ${d.domain.bhavas.join(', ')} · karakas ${d.domain.karakas.map((k) => VedicMath.planets[k]!.name).join(', ')} · ${d.domain.varga}',
+            subtitle: '${d.domain.code} ${d.domain.v6Name} · houses ${d.domain.bhavas.join(', ')} · karakas ${d.domain.karakas.map((k) => VedicMath.planets[k]!.name).join(', ')} · ${d.domain.vargas.join(', ')}',
             children: [
               Text(d.interpretation, style: const TextStyle(height: 1.4)),
               const SizedBox(height: 8),
@@ -179,14 +199,23 @@ class DomainDetailScreen extends ConsumerWidget {
               KeyValueRow('Transit', state(EvidenceLayer.transit)),
               KeyValueRow('Varga', state(EvidenceLayer.varga)),
               KeyValueRow('Source tier', d.tier.label),
+              KeyValueRow('Master KB status', d.masterStatus),
               const SizedBox(height: 6),
               Wrap(spacing: 6, runSpacing: 4, children: [
+                Pill(d.v6Status.code, _v6Color(d.v6Status, scheme)),
+                Pill(d.confidence.code, _confColor(d.confidence, scheme)),
                 for (final st in d.statuses) Pill(st.code, _statusColor(st, scheme)),
                 Pill(d.tier.code, scheme.secondary),
               ]),
               const SizedBox(height: 6),
               KeyValueRow('Dimensions', d.domain.dimensions.join(', ')),
+              Text('Confidence is an evidence state, not a probability.', style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant)),
             ],
+          ),
+          SectionCard(
+            title: 'Dependency check',
+            subtitle: 'Required layers from the Master Knowledge Base prediction template.',
+            children: [for (final e in d.dependencies.entries) KeyValueRow(e.key.replaceAll('_', ' ').toLowerCase(), e.value)],
           ),
           for (final l in EvidenceLayer.values)
             if (d.layer(l).isNotEmpty)
@@ -194,12 +223,13 @@ class DomainDetailScreen extends ConsumerWidget {
                 title: '${l.level}. ${l.label}',
                 children: [
                   for (final e in d.layer(l))
-                    BulletLine('${e.text}  [${e.tier.code}; ${e.rule}]', mark: e.mark, color: _markColor(e.polarity, scheme), tag: e.id),
+                    BulletLine('${e.text}  [${e.ruleId} ${KnowledgeRegistry.rule(e.ruleId).name}; ${e.tier.code}; ${e.rule}]',
+                        mark: e.mark, color: _markColor(e.polarity, scheme), tag: e.id),
                 ],
               ),
           SectionCard(
             title: 'Bhāva-lord chains',
-            subtitle: 'Bhāva → lord → lord\'s sign → dispositor → dispositor\'s house and strength',
+            subtitle: 'Bhāva → lord → lord\'s sign → dispositor → its house and strength → next dispositor',
             children: [for (final c in d.lordChains) BulletLine(c, mark: '→')],
           ),
           SectionCard(
@@ -216,13 +246,64 @@ class DomainDetailScreen extends ConsumerWidget {
             ],
           ),
           SectionCard(
+            title: 'Timing windows (Daśā ∩ transit)',
+            subtitle: 'Antardaśā periods that activate the domain, narrowed to the passes of degree-exact transit triggers. Windows, not dates.',
+            children: [
+              if (d.timingWindows.isEmpty) const BulletLine('No Daśā window coincides with a transit trigger in the next three years.'),
+              for (final w in d.timingWindows.take(8)) ...[
+                Row(children: [
+                  Expanded(child: Text('${w.start} – ${w.end}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+                  Pill(w.status, w.status == 'CONFIRMED_BY_TRANSIT' ? Colors.green : scheme.primary),
+                ]),
+                Wrap(spacing: 4, runSpacing: 4, children: [for (final a in w.activation) Pill(a, scheme.secondary)]),
+                for (final t in w.triggers.take(4)) BulletLine(t.summary, mark: '→'),
+                const SizedBox(height: 6),
+              ],
+            ],
+          ),
+          SectionCard(
+            title: 'Transit triggers (next 3 years)',
+            subtitle: 'Jupiter, Saturn, Rahu and Ketu reaching an exact conjunction or Parashari aspect point of this domain\'s lords, karakas or cusps.',
+            children: [
+              if (d.triggers.isEmpty) const BulletLine('No degree-exact trigger in the next three years.'),
+              for (final t in d.triggers.take(12)) BulletLine(t.summary, mark: t.exactJds.isEmpty ? '△' : '◎', tag: t.strength),
+            ],
+          ),
+          SectionCard(
             title: 'Slow-planet contacts (next 3 years)',
             children: [
               if (d.transits.isEmpty) const BulletLine('Jupiter and Saturn do not enter this house sign in the next three years.'),
               for (final t in d.transits) BulletLine('${t.date}: ${t.note}${t.retrogradeRecontact ? ' (retrograde re-contact)' : ''}', mark: '→'),
             ],
           ),
+          SectionCard(
+            title: 'Rule trace',
+            subtitle: 'Rules evaluated for this domain; ✓ produced evidence.',
+            children: [
+              Wrap(spacing: 4, runSpacing: 4, children: [
+                for (final e in d.ruleTrace.entries) Pill('${e.key} ${e.value ? '✓' : '·'}', e.value ? Colors.green : scheme.outline),
+              ]),
+            ],
+          ),
+          SectionCard(
+            title: 'Explanation graph',
+            subtitle: '${d.graph.nodes.length} nodes, ${d.graph.edges.length} edges: prediction → event → layer → evidence → rule → source.',
+            children: [
+              for (final r in d.graph.nodes.values.where((n) => n.type == 'Rule'))
+                BulletLine('${r.label} ← ${d.graph.edges.where((e) => e.to == r.id && e.relation == 'DERIVED_FROM').length} evidence'
+                    '${d.graph.from(r.id).isEmpty ? '' : ' · ${d.graph.from(r.id).map((e) => d.graph.nodes[e.to]!.label).join('; ')}'}'),
+            ],
+          ),
           Wrap(spacing: 8, runSpacing: 8, children: [
+            OutlinedButton.icon(
+              icon: const Icon(Icons.account_tree_outlined, size: 18),
+              label: const Text('Copy explanation (JSON)'),
+              onPressed: () async {
+                await Clipboard.setData(ClipboardData(
+                    text: const JsonEncoder.withIndent('  ').convert({'explanation': d.explanation(), 'rule_trace': d.ruleTrace, 'graph': d.graph.toJson()})));
+                if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Explanation copied')));
+              },
+            ),
             OutlinedButton.icon(
               icon: const Icon(Icons.copy, size: 18),
               label: const Text('Copy report'),
@@ -236,10 +317,11 @@ class DomainDetailScreen extends ConsumerWidget {
               label: const Text('Ask AI to write it up'),
               onPressed: () {
                 final prompt = 'Write a ${d.domain.name.toLowerCase()} reading from the evidence trace below, produced by a rule-based Jyotisha engine. '
-                    'Rules: use only this evidence; cite the rule IDs (R1, R2...) for each statement; keep supporting and obstructing factors visible; '
+                    'Rules: use only this evidence; cite the evidence IDs (${d.domain.code}-EV1...) for each statement; keep supporting and obstructing factors visible; '
                     'separate natal promise, Daśā timing and transit confirmation; never claim an event will definitely happen; '
                     'label systematic synthesis as such. ${d.domain.caution ?? ''}\n\n${d.report()}\n\nLord chains:\n${d.lordChains.join('\n')}\n\n'
                     'Event windows:\n${d.windows.take(5).map((w) => '${w.label} ${w.start}-${w.end}: ${w.factors.join('; ')}').join('\n')}\n\n'
+                    'Timing windows (Daśā ∩ transit):\n${d.timingWindows.take(5).map((w) => '${w.start}-${w.end}: ${w.activation.join(', ')}').join('\n')}\n\n'
                     'Chart:\n${ChartSummary.describe(report.chart, name: name)}';
                 showAiSheet(context, ref, title: d.domain.name, prompt: prompt, profileId: profileId);
               },
@@ -254,7 +336,8 @@ class DomainDetailScreen extends ConsumerWidget {
 class _RectifyTab extends StatefulWidget {
   final ChartData chart;
   final CalcConfig cfg;
-  const _RectifyTab({required this.chart, required this.cfg});
+  final SensitivityResult? sensitivity;
+  const _RectifyTab({required this.chart, required this.cfg, this.sensitivity});
 
   @override
   State<_RectifyTab> createState() => _RectifyTabState();
@@ -319,6 +402,19 @@ class _RectifyTabState extends State<_RectifyTab> {
           style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12),
         ),
         const SizedBox(height: 8),
+        if (widget.sensitivity != null)
+          SectionCard(
+            title: 'Birth-time sensitivity',
+            subtitle: 'The chart recomputed at T−5, T−2, T, T+2 and T+5 minutes.',
+            children: [
+              for (final e in widget.sensitivity!.values.entries)
+                BulletLine(
+                  '${e.key}: ${e.value.toSet().length == 1 ? e.value.first : e.value.join(' | ')}',
+                  mark: e.value.toSet().length == 1 ? '✓' : '⚠',
+                  color: e.value.toSet().length == 1 ? Colors.green : Colors.orange,
+                ),
+            ],
+          ),
         for (int i = 0; i < _events.length; i++)
           Card(
             child: ListTile(
@@ -399,23 +495,57 @@ class _RectifyTabState extends State<_RectifyTab> {
 
 class _AuditTab extends StatelessWidget {
   final SynthesisReport report;
-  const _AuditTab({required this.report});
+  final String? name;
+  const _AuditTab({required this.report, this.name});
 
-  String _json() => const JsonEncoder.withIndent('  ').convert({
+  /// Reproducibility package (Volume 6 §140).
+  Map<String, dynamic> _package() => {
         'audit': report.audit,
+        'normalized_input': TimingMath.normalizedInput(report.chart, CalcConfig.defaults)..remove('config'),
         'input_flags': [for (final f in report.inputFlags) {'severity': f.severity, 'message': f.message}],
+        if (report.sensitivity != null) 'birth_time_sensitivity': report.sensitivity!.toJson(),
+        if (report.jaimini != null)
+          'jaimini': {
+            'scheme': report.jaimini!.scheme,
+            'karakas': {for (final k in report.jaimini!.karakas) k.code: k.planet},
+            'arudhas': {for (final a in report.jaimini!.arudhas) a.code: VedicMath.rashis[a.rashi].name},
+          },
         'predictions': [
           for (final d in report.domains)
             {
-              'domain': d.domain.name,
+              'event_domain': d.domain.v6Name,
+              'code': d.domain.code,
               'target_bhavas': d.domain.bhavas,
-              'status': d.statuses.map((s) => s.code).toList(),
+              'status': d.v6Status.code,
+              'confidence': d.confidence.code,
+              'master_status': d.masterStatus,
+              'evidence_states': d.statuses.map((s) => s.code).toList(),
+              'dependencies': d.dependencies,
               'source_tier': d.tier.code,
-              'rule_trace': [for (final e in d.evidence) '${e.id} ${e.layer.level} ${e.mark} ${e.text} [${e.rule}]'],
+              'evidence': [for (final e in d.evidence) {'id': e.id, 'layer': e.layer.level, 'polarity': e.polarity.name, 'rule': e.ruleId, 'class': e.tier.code, 'text': e.text}],
+              'rule_trace': d.ruleTrace,
+              'timing_windows': [for (final w in d.timingWindows) w.toJson()],
               'interpretation': d.interpretation,
             },
         ],
-      });
+      };
+
+  String _markdown() {
+    final b = StringBuffer('# Synthesis audit\n\n');
+    for (final e in report.audit.entries) {
+      b.writeln('- **${e.key.replaceAll('_', ' ')}:** ${e.value}');
+    }
+    if (report.sensitivity != null) {
+      b.writeln('\n## Birth-time sensitivity\n');
+      b.writeln('- Stable: ${report.sensitivity!.stable.join(', ')}');
+      b.writeln('- Sensitive: ${report.sensitivity!.sensitive.isEmpty ? 'none' : report.sensitivity!.sensitive.join(', ')}');
+    }
+    for (final d in report.domains) {
+      b.writeln('\n## ${d.domain.code} ${d.domain.name}\n');
+      b.writeln('```\n${d.report()}```');
+    }
+    return b.toString();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -433,18 +563,111 @@ class _AuditTab extends StatelessWidget {
         ),
         SectionCard(
           title: 'Audit log',
-          subtitle: 'Everything needed to reproduce these results.',
+          subtitle: 'Everything needed to reproduce these results. The same input and versions give the same hashes.',
           children: [for (final e in report.audit.entries) KeyValueRow(e.key.replaceAll('_', ' '), e.value)],
         ),
-        OutlinedButton.icon(
-          icon: const Icon(Icons.copy, size: 18),
-          label: const Text('Copy audit log and rule traces (JSON)'),
-          onPressed: () async {
-            await Clipboard.setData(ClipboardData(text: _json()));
-            if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Audit log copied')));
-          },
-        ),
+        Wrap(spacing: 8, runSpacing: 8, children: [
+          OutlinedButton.icon(
+            icon: const Icon(Icons.copy, size: 18),
+            label: const Text('Copy reproducibility package (JSON)'),
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: const JsonEncoder.withIndent('  ').convert(_package())));
+              if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reproducibility package copied')));
+            },
+          ),
+          OutlinedButton.icon(
+            icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
+            label: const Text('Share as PDF'),
+            onPressed: () => PdfService().shareMarkdownReport(title: 'Synthesis audit', name: name ?? 'Chart', markdown: _markdown()),
+          ),
+        ]),
       ],
     );
   }
+}
+
+/// Jaimini Chara Karakas and Arudha Padas.
+class _JaiminiCard extends StatelessWidget {
+  final SynthesisReport report;
+  const _JaiminiCard(this.report);
+
+  @override
+  Widget build(BuildContext context) {
+    final j = report.jaimini!;
+    String n(String p) => VedicMath.planets[p]!.name;
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ExpansionTile(
+        title: const Text('Jaimini karakas & Arudhas', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+        subtitle: Text('AK ${n(j.karakas.first.planet)} · AL ${VedicMath.rashis[j.arudhaLagna.rashi].name} · UL ${VedicMath.rashis[j.upapada.rashi].name}',
+            style: const TextStyle(fontSize: 12)),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        children: [
+          Text('${j.scheme}-karaka scheme (change in Settings → Style). Karakamsa: ${VedicMath.rashis[j.karakamsa].name}.', style: const TextStyle(fontSize: 12)),
+          const SizedBox(height: 6),
+          CompactTable(
+            header: const ['Karaka', 'Planet', 'Degree'],
+            rows: [for (final k in j.karakas) ['${k.code} ${k.name}', n(k.planet), '${k.degree.toStringAsFixed(2)}°${k.planet == 'rahu' ? ' (30−d)' : ''}']],
+          ),
+          const SizedBox(height: 8),
+          CompactTable(
+            header: const ['Pada', 'Sign', 'House'],
+            rows: [for (final a in j.arudhas) ['${a.code} ${a.name}', VedicMath.rashis[a.rashi].name, '${a.fromLagna}${a.exception ? '*' : ''}']],
+          ),
+          const SizedBox(height: 4),
+          const Text('* 10th-from exception applied (the count fell in the house or the 7th from it).', style: TextStyle(fontSize: 11)),
+        ],
+      ),
+    );
+  }
+}
+
+/// All Daśā ∩ transit windows and the current Daśā chain down to Sūkṣma.
+class _TimingTab extends StatelessWidget {
+  final SynthesisReport report;
+  const _TimingTab({required this.report});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final c = report.chart;
+    final now = Ephemeris.nowJd();
+    final chain = DashaCalculations.compute(c.jd, c.planetLongitudes['moon']!, utcOffset: c.utcOffset, levels: 4).runningAt(now);
+    const levels = ['Mahādaśā', 'Antardaśā', 'Pratyantardaśā', 'Sūkṣmadaśā'];
+    final windows = [for (final d in report.domains) for (final w in d.timingWindows) (d, w)]..sort((a, b) => a.$2.startJd.compareTo(b.$2.startJd));
+    final active = {for (final d in report.domains) for (final t in d.triggers) if (t.activeAt(now)) t.tag: t};
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 32),
+      children: [
+        SectionCard(
+          title: 'Current Daśā chain',
+          children: [
+            for (int i = 0; i < chain.length; i++)
+              KeyValueRow(levels[i], '${VedicMath.planets[chain[i].lord]!.name}  ${chain[i].startDate} – ${chain[i].endDate}'),
+          ],
+        ),
+        SectionCard(
+          title: 'Transit triggers in orb now',
+          children: [
+            if (active.isEmpty) const BulletLine('No degree-exact trigger is in orb today.'),
+            for (final t in active.values) BulletLine('${t.summary} — ${t.applyingAt(now) ? 'applying' : 'separating'}', mark: '◎', tag: t.strength),
+          ],
+        ),
+        SectionCard(
+          title: 'Timing windows, all domains',
+          subtitle: 'Daśā periods intersected with transit passes (next three years). Evidence states, not predictions of exact dates.',
+          children: [
+            if (windows.isEmpty) const BulletLine('No Daśā window coincides with a transit trigger in the next three years.'),
+            for (final (d, w) in windows.take(40))
+              BulletLine('${w.start} – ${w.end}  ${d.domain.name}: ${w.activation.join(', ')}',
+                  mark: w.status == 'CONFIRMED_BY_TRANSIT' ? '◎' : '◇', color: w.status == 'CONFIRMED_BY_TRANSIT' ? Colors.green : scheme.primary),
+          ],
+        ),
+        Text('Transit orb ${report.audit['transit_trigger_orb'] ?? ''}; dates are in the chart\'s local time ($_offset).',
+            style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant)),
+      ],
+    );
+  }
+
+  String get _offset => 'UTC${report.chart.utcOffset >= 0 ? '+' : ''}${report.chart.utcOffset}';
 }

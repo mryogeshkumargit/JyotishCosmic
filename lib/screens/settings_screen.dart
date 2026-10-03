@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../core/calc_config.dart';
+import '../core/ephemeris.dart';
 import '../providers/settings_provider.dart';
 import '../providers/sync_provider.dart';
 import '../services/ai_service.dart';
@@ -272,6 +273,67 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> with SingleTick
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              DropdownButtonFormField<String>(
+                isExpanded: true,
+                key: ValueKey('ay${calc.ayanamsa}'),
+                initialValue: calc.ayanamsa,
+                decoration: const InputDecoration(labelText: 'Ayanamsa', helperText: 'Applies to charts opened after the change'),
+                items: [
+                  for (final e in Ephemeris.ayanamsaModes.entries)
+                    DropdownMenuItem(value: e.key, child: Text(e.value.$2, overflow: TextOverflow.ellipsis)),
+                ],
+                onChanged: (v) => notifier.updateCalc(calc.copyWith(ayanamsa: v)),
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<bool>(
+                isExpanded: true,
+                key: ValueKey('tn${calc.trueNode}'),
+                initialValue: calc.trueNode,
+                decoration: const InputDecoration(labelText: 'Rahu/Ketu node'),
+                items: const [
+                  DropdownMenuItem(value: false, child: Text('Mean node')),
+                  DropdownMenuItem(value: true, child: Text('True (osculating) node')),
+                ],
+                onChanged: (v) => notifier.updateCalc(calc.copyWith(trueNode: v)),
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<double>(
+                isExpanded: true,
+                key: ValueKey('dy${calc.dashaYearDays}'),
+                initialValue: calc.dashaYearDays,
+                decoration: const InputDecoration(labelText: 'Daśā year length'),
+                items: const [
+                  DropdownMenuItem(value: 365.25, child: Text('365.25 days (Julian year)')),
+                  DropdownMenuItem(value: 365.2425, child: Text('365.2425 days (Gregorian year)')),
+                ],
+                onChanged: (v) => notifier.updateCalc(calc.copyWith(dashaYearDays: v)),
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<int>(
+                isExpanded: true,
+                key: ValueKey('ck${calc.karakaScheme}'),
+                initialValue: calc.karakaScheme,
+                decoration: const InputDecoration(labelText: 'Jaimini Chara Karakas'),
+                items: const [
+                  DropdownMenuItem(value: 8, child: Text('8 karakas (with Rahu)')),
+                  DropdownMenuItem(value: 7, child: Text('7 karakas (Sun to Saturn)')),
+                ],
+                onChanged: (v) => notifier.updateCalc(calc.copyWith(karakaScheme: v)),
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<double>(
+                isExpanded: true,
+                key: ValueKey('to${calc.transitOrb}'),
+                initialValue: const [1.0, 2.0, 3.0].contains(calc.transitOrb) ? calc.transitOrb : 2.0,
+                decoration: const InputDecoration(labelText: 'Transit trigger orb'),
+                items: const [
+                  DropdownMenuItem(value: 1.0, child: Text('1° (tight)')),
+                  DropdownMenuItem(value: 2.0, child: Text('2° (default)')),
+                  DropdownMenuItem(value: 3.0, child: Text('3° (wide)')),
+                ],
+                onChanged: (v) => notifier.updateCalc(calc.copyWith(transitOrb: v)),
+              ),
+              const SizedBox(height: 16),
               DropdownButtonFormField<NodeAspectRule>(
                 isExpanded: true,
                 key: ValueKey('na${calc.nodeAspects}'),

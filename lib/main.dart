@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sweph/sweph.dart';
 import 'core/ephemeris.dart';
+import 'core/vedic_math.dart';
 import 'services/location_service.dart';
 import 'theme/app_theme.dart';
 import 'screens/dashboard_screen.dart';
@@ -48,6 +49,9 @@ class MobileJyotishApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsProvider);
+    // Apply the calculation conventions chosen in Settings to the engines.
+    Ephemeris.configure(ayanamsa: settings.calc.ayanamsa, trueNode: settings.calc.trueNode);
+    DashaCalculations.yearDays = settings.calc.dashaYearDays;
 
     ThemeData activeTheme;
     if (settings.themeMode == 'Dark') {

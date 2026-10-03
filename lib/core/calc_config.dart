@@ -23,7 +23,8 @@ enum WarRule {
 }
 
 class CalcConfig {
-  static const String engineVersion = '2.0.0';
+  static const String engineVersion = '6.0.0';
+  static const String ruleSetVersion = 'jyotisha-rules-1.0.0';
 
   final NodeAspectRule nodeAspects;
   final WarRule warRule;
@@ -43,6 +44,21 @@ class CalcConfig {
   /// Degrees around a Bhava-sandhi (equal houses from the ascendant) treated as weak.
   final double sandhiOrb;
 
+  /// Sidereal mode code (see Ephemeris.ayanamsaModes).
+  final String ayanamsa;
+
+  /// True (osculating) instead of mean lunar node.
+  final bool trueNode;
+
+  /// Days per Vimshottari year.
+  final double dashaYearDays;
+
+  /// Jaimini Chara Karaka scheme: 7 (Sun-Saturn) or 8 (including Rahu).
+  final int karakaScheme;
+
+  /// Orb (degrees) for degree-exact transit triggers.
+  final double transitOrb;
+
   const CalcConfig({
     this.nodeAspects = NodeAspectRule.fiveSevenNine,
     this.warRule = WarRule.northernLatitude,
@@ -51,6 +67,11 @@ class CalcConfig {
     this.deepCombustionFraction = 0.5,
     this.stationaryFraction = 0.1,
     this.sandhiOrb = 1.0,
+    this.ayanamsa = 'LAHIRI',
+    this.trueNode = false,
+    this.dashaYearDays = 365.25,
+    this.karakaScheme = 8,
+    this.transitOrb = 2.0,
   });
 
   static const CalcConfig defaults = CalcConfig();
@@ -69,6 +90,11 @@ class CalcConfig {
     double? deepCombustionFraction,
     double? stationaryFraction,
     double? sandhiOrb,
+    String? ayanamsa,
+    bool? trueNode,
+    double? dashaYearDays,
+    int? karakaScheme,
+    double? transitOrb,
   }) =>
       CalcConfig(
         nodeAspects: nodeAspects ?? this.nodeAspects,
@@ -78,6 +104,11 @@ class CalcConfig {
         deepCombustionFraction: deepCombustionFraction ?? this.deepCombustionFraction,
         stationaryFraction: stationaryFraction ?? this.stationaryFraction,
         sandhiOrb: sandhiOrb ?? this.sandhiOrb,
+        ayanamsa: ayanamsa ?? this.ayanamsa,
+        trueNode: trueNode ?? this.trueNode,
+        dashaYearDays: dashaYearDays ?? this.dashaYearDays,
+        karakaScheme: karakaScheme ?? this.karakaScheme,
+        transitOrb: transitOrb ?? this.transitOrb,
       );
 
   String get nodeAspectLabel => switch (nodeAspects) {
@@ -94,6 +125,14 @@ class CalcConfig {
   /// Rule versions for the audit log.
   Map<String, String> get ruleVersions => {
         'engine_version': engineVersion,
+        'rule_set_version': ruleSetVersion,
+        'zodiac': 'SIDEREAL',
+        'ayanamsha_code': ayanamsa,
+        'node_mode': trueNode ? 'TRUE_NODE' : 'MEAN_NODE',
+        'dasha_system': 'VIMSHOTTARI',
+        'dasha_year_basis': dashaYearDays.toString(),
+        'chara_karaka_scheme': '$karakaScheme karakas${karakaScheme == 8 ? ' (Rahu counted from the end of its sign)' : ''}',
+        'transit_trigger_orb': '${transitOrb.toStringAsFixed(1)}°',
         'aspect_school': 'Parashari graha drishti (7th all; Mars 4/8, Jupiter 5/9, Saturn 3/10); sputa drishti per BPHS',
         'node_aspects': nodeAspectLabel,
         'combustion_orb_table': 'Moon 12, Mars 17, Mercury 14 (12 retro), Jupiter 11, Venus 10 (8 retro), Saturn 15; deep = ${(deepCombustionFraction * 100).round()}% of orb',

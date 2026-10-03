@@ -122,9 +122,32 @@ class Ephemeris {
   static final SwephFlag _helioFlags = SwephFlag.SEFLG_SWIEPH | SwephFlag.SEFLG_HELCTR | SwephFlag.SEFLG_SIDEREAL;
 
   /// Description of the astronomical conventions, for audit logs.
-  static const String ephemerisLabel = 'Swiss Ephemeris (sweph), sepl_18/semo_18 files, Moshier fallback';
-  static const String nodeModel = 'Mean lunar node';
-  static const String ayanamsaLabel = 'Lahiri (Chitrapaksha); Krishnamurti for KP';
+  static const String ephemerisLabel = 'Swiss Ephemeris (sweph 2.10.3), sepl_18/semo_18 files, Moshier fallback';
+
+  /// Sidereal mode used for "Lahiri" charts (configurable in Settings).
+  static String ayanamsaCode = 'LAHIRI';
+
+  /// Use the true (osculating) node instead of the mean node for Rahu/Ketu.
+  static bool trueNode = false;
+
+  static const Map<String, (SiderealMode, String)> ayanamsaModes = {
+    'LAHIRI': (SiderealMode.SE_SIDM_LAHIRI, 'Lahiri (Chitrapaksha, Swiss Ephemeris default)'),
+    'LAHIRI_ICRC': (SiderealMode.SE_SIDM_LAHIRI_ICRC, 'Lahiri ICRC (Indian Calendar Reform Committee)'),
+    'LAHIRI_1940': (SiderealMode.SE_SIDM_LAHIRI_1940, 'Lahiri 1940'),
+    'TRUE_CHITRA': (SiderealMode.SE_SIDM_TRUE_CITRA, 'True Chitrapaksha (Spica at 180°)'),
+    'RAMAN': (SiderealMode.SE_SIDM_RAMAN, 'B. V. Raman'),
+    'YUKTESHWAR': (SiderealMode.SE_SIDM_YUKTESHWAR, 'Sri Yukteshwar'),
+  };
+
+  /// Applies the calculation conventions chosen in Settings.
+  static void configure({String? ayanamsa, bool? trueNode}) {
+    if (ayanamsa != null && ayanamsaModes.containsKey(ayanamsa)) ayanamsaCode = ayanamsa;
+    if (trueNode != null) Ephemeris.trueNode = trueNode;
+  }
+
+  static String get nodeModel => trueNode ? 'True (osculating) lunar node' : 'Mean lunar node';
+  static String get ayanamsaLabel => '${ayanamsaModes[ayanamsaCode]!.$2}; Krishnamurti for KP';
+  static HeavenlyBody get _nodeBody => trueNode ? HeavenlyBody.SE_TRUE_NODE : HeavenlyBody.SE_MEAN_NODE;
 
   static double _norm360(double d) {
     final x = d % 360;
@@ -167,7 +190,7 @@ class Ephemeris {
 
   static void _setAyanamsa(Ayanamsa mode) {
     Sweph.swe_set_sid_mode(
-      mode == Ayanamsa.krishnamurti ? SiderealMode.SE_SIDM_KRISHNAMURTI : SiderealMode.SE_SIDM_LAHIRI,
+      mode == Ayanamsa.krishnamurti ? SiderealMode.SE_SIDM_KRISHNAMURTI : ayanamsaModes[ayanamsaCode]!.$1,
     );
   }
 
@@ -180,7 +203,7 @@ class Ephemeris {
   static (double, double) siderealPosition(String planet, double jdUt, [Ayanamsa mode = Ayanamsa.lahiri]) {
     _setAyanamsa(mode);
     if (planet == 'rahu' || planet == 'ketu') {
-      final node = Sweph.swe_calc_ut(jdUt, HeavenlyBody.SE_MEAN_NODE, _siderealFlags);
+      final node = Sweph.swe_calc_ut(jdUt, _nodeBody, _siderealFlags);
       final lon = planet == 'rahu' ? node.longitude : _norm360(node.longitude + 180);
       return (lon, node.speedInLongitude);
     }
@@ -200,7 +223,7 @@ class Ephemeris {
   /// Tropical declination of a body (degrees).
   static double declination(String planet, double jdUt) {
     if (planet == 'rahu' || planet == 'ketu') {
-      final node = Sweph.swe_calc_ut(jdUt, HeavenlyBody.SE_MEAN_NODE, _equatorialFlags);
+      final node = Sweph.swe_calc_ut(jdUt, _nodeBody, _equatorialFlags);
       return planet == 'rahu' ? node.latitude : -node.latitude;
     }
     final body = _bodies[planet];
