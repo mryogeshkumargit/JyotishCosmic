@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/location_service.dart';
+import '../core/l10n.dart';
 
+/// Place-of-birth search over the bundled (offline) city database.
 class CityAutocomplete extends StatefulWidget {
-  final Function(LocationResult) onSelected;
+  final ValueChanged<LocationResult> onSelected;
+  final String? initialText;
 
-  const CityAutocomplete({super.key, required this.onSelected});
+  const CityAutocomplete({super.key, required this.onSelected, this.initialText});
 
   @override
   State<CityAutocomplete> createState() => _CityAutocompleteState();
@@ -13,29 +16,36 @@ class CityAutocomplete extends StatefulWidget {
 
 class _CityAutocompleteState extends State<CityAutocomplete> {
   final LocationService _locationService = LocationService();
-  final TextEditingController _controller = TextEditingController();
+  late final TextEditingController _controller = TextEditingController(text: widget.initialText ?? '');
   final FocusNode _focusNode = FocusNode();
-  
+
   List<LocationResult> _options = [];
   bool _isLoading = false;
   Timer? _debounce;
   bool _showDropdown = false;
+  int _searchId = 0;
 
   @override
   void initState() {
     super.initState();
     _focusNode.addListener(() {
       if (!_focusNode.hasFocus) {
-        // Delay hiding slightly so taps on items register
+        // Delay hiding slightly so taps on items register.
         Future.delayed(const Duration(milliseconds: 200), () {
           if (mounted) setState(() => _showDropdown = false);
         });
-      } else {
-        if (_options.isNotEmpty) {
-          setState(() => _showDropdown = true);
-        }
+      } else if (_options.isNotEmpty) {
+        setState(() => _showDropdown = true);
       }
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant CityAutocomplete oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialText != oldWidget.initialText && widget.initialText != null) {
+      _controller.text = widget.initialText!;
+    }
   }
 
   @override
@@ -47,12 +57,12 @@ class _CityAutocompleteState extends State<CityAutocomplete> {
   }
 
   void _onSearchChanged(String query) {
-    if (_debounce?.isActive ?? false) _debounce!.cancel();
-    
-    if (query.length < 3) {
+    _debounce?.cancel();
+    if (query.trim().length < 2) {
       setState(() {
         _options = [];
         _showDropdown = false;
+        _isLoading = false;
       });
       return;
     }
@@ -62,9 +72,10 @@ class _CityAutocompleteState extends State<CityAutocomplete> {
       _showDropdown = true;
     });
 
-    _debounce = Timer(const Duration(milliseconds: 600), () async {
+    final int id = ++_searchId;
+    _debounce = Timer(const Duration(milliseconds: 250), () async {
       final results = await _locationService.searchCity(query);
-      if (mounted) {
+      if (mounted && id == _searchId) {
         setState(() {
           _options = results;
           _isLoading = false;
@@ -75,6 +86,7 @@ class _CityAutocompleteState extends State<CityAutocomplete> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -82,35 +94,33 @@ class _CityAutocompleteState extends State<CityAutocomplete> {
           controller: _controller,
           focusNode: _focusNode,
           onChanged: _onSearchChanged,
-          style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+          style: TextStyle(color: scheme.onSurface),
           decoration: InputDecoration(
-            labelText: 'Place of Birth',
-            labelStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
-            hintText: 'Start typing city name...',
-            hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4)),
-            prefixIcon: Icon(Icons.location_city, color: Theme.of(context).colorScheme.secondary),
-            suffixIcon: _isLoading 
+            labelText: tr('Place of Birth', 'जन्म स्थान'),
+            hintText: tr('Start typing a city name...', 'शहर का नाम लिखना शुरू करें...'),
+            prefixIcon: Icon(Icons.location_city, color: scheme.secondary),
+            suffixIcon: _isLoading
                 ? Container(
-                    width: 20, 
-                    height: 20, 
+                    width: 20,
+                    height: 20,
                     padding: const EdgeInsets.all(12),
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Theme.of(context).colorScheme.secondary),
-                  ) 
+                    child: CircularProgressIndicator(strokeWidth: 2, color: scheme.secondary),
+                  )
                 : null,
-            filled: true,
-            fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
           ),
         ),
-        if (_showDropdown && (_options.isNotEmpty || _isLoading)) ...[
+        if (_showDropdown && !_isLoading && _options.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 8, left: 12),
+            child: Text(tr('No matching city. You can enter coordinates manually below.', 'कोई शहर नहीं मिला। आप नीचे अक्षांश-देशांतर स्वयं लिख सकते हैं।'),
+                style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12)),
+          ),
+        if (_showDropdown && _options.isNotEmpty) ...[
           const SizedBox(height: 8),
           Material(
             elevation: 4,
             borderRadius: BorderRadius.circular(12),
-            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            color: scheme.surfaceContainerHighest,
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: 250),
               child: ListView.builder(
@@ -120,21 +130,24 @@ class _CityAutocompleteState extends State<CityAutocomplete> {
                 itemBuilder: (context, index) {
                   final option = _options[index];
                   return ListTile(
-                    title: Text(option.displayName, style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 14)),
+                    dense: true,
+                    title: Text(option.displayName, style: TextStyle(color: scheme.onSurface, fontSize: 14)),
+                    subtitle: Text(
+                      '${option.lat.toStringAsFixed(2)}, ${option.lon.toStringAsFixed(2)}  •  ${option.tzName ?? ''}',
+                      style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 11),
+                    ),
                     onTap: () {
                       _controller.text = option.displayName;
                       widget.onSelected(option);
-                      setState(() {
-                        _showDropdown = false;
-                        _focusNode.unfocus();
-                      });
+                      setState(() => _showDropdown = false);
+                      _focusNode.unfocus();
                     },
                   );
                 },
               ),
             ),
           ),
-        ]
+        ],
       ],
     );
   }

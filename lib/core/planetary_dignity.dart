@@ -113,17 +113,42 @@ class PlanetaryDignity {
     'saturn': 10, // Aquarius
   };
 
+  /// Moolatrikona degree ranges within the sign (Volume 4 §8; BPHS).
+  static const Map<String, (double, double)> moolatrikonaRanges = {
+    'sun': (0, 20), 'moon': (3, 30), 'mars': (0, 12), 'mercury': (15, 20),
+    'jupiter': (0, 10), 'venus': (0, 15), 'saturn': (0, 20),
+  };
+
+  /// Deep exaltation points (sidereal longitude); debilitation is 180° away.
+  static const Map<String, double> deepExaltation = {
+    'sun': 10, 'moon': 33, 'mars': 298, 'mercury': 165, 'jupiter': 95, 'venus': 357, 'saturn': 200,
+  };
+
   /// Returns a rich dignity string for the planet based on its sign placement and relations.
-  static String getAdvancedDignity(String planet, int rashiIndex, Map<String, int> allPlanetRashis) {
+  ///
+  /// When [degree] (0-30 within the sign) is given, the degree ranges apply:
+  /// the Moon is exalted in Taurus 0-3° and Moolatrikona after; Mercury is
+  /// exalted in Virgo 0-15°, Moolatrikona 15-20° and in its own sign after;
+  /// each Moolatrikona sign is "own sign" outside its Moolatrikona range.
+  static String getAdvancedDignity(String planet, int rashiIndex, Map<String, int> allPlanetRashis, {double? degree}) {
     final p = VedicMath.planets[planet];
     if (p == null) return 'Neutral';
+    final mt = moolatrikonaSigns[planet];
+    final range = moolatrikonaRanges[planet];
+
+    if (degree != null && mt == rashiIndex && range != null) {
+      // Exaltation and Moolatrikona share a sign for the Moon and Mercury.
+      if (p.exalt == rashiIndex && degree < range.$1) return 'Exalted';
+      if (degree >= range.$1 && degree < range.$2) return 'Moolatrikona';
+      return 'Own Sign';
+    }
 
     // 1. Exaltation / Debilitation
     if (p.exalt == rashiIndex) return 'Exalted';
     if (p.debi == rashiIndex) return 'Debilitated';
 
     // 2. Moolatrikona
-    if (moolatrikonaSigns[planet] == rashiIndex) return 'Moolatrikona';
+    if (mt == rashiIndex) return 'Moolatrikona';
 
     // 3. Own Sign
     if (p.ownSigns.contains(rashiIndex)) return 'Own Sign';

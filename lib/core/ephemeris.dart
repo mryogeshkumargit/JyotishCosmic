@@ -1,225 +1,357 @@
-import 'dart:math' as math;
+import 'package:sweph/sweph.dart';
 
+/// Result of a sidereal chart computation.
 class ChartData {
+  /// House number (1-12, whole-sign from Lagna) -> planet abbreviations.
   final Map<int, List<String>> housePlanets;
+
+  /// Sidereal longitudes (0-360) keyed by lowercase planet name.
   final Map<String, double> planetLongitudes;
+
+  /// Daily motion in longitude (degrees/day). Negative means retrograde.
+  final Map<String, double> planetSpeeds;
+
+  /// Sidereal ascendant (0-360).
   final double ascendantSidereal;
+
+  /// Julian day number in Universal Time.
   final double jd;
 
-  ChartData(this.housePlanets, this.planetLongitudes, this.ascendantSidereal, this.jd);
+  /// Ayanamsa used to derive the sidereal positions.
+  final double ayanamsa;
+
+  final double lat;
+  final double lon;
+  final double utcOffset;
+
+  /// Ecliptic latitude (degrees, north positive) of each body.
+  final Map<String, double> planetLatitudes;
+
+  /// Tropical declination (degrees, north positive) of each body.
+  final Map<String, double> declinations;
+
+  /// Sidereal heliocentric longitude of the planets (not Sun, Moon or nodes).
+  final Map<String, double> heliocentricLongitudes;
+
+  /// Sidereal Midheaven (10th cusp, MC).
+  final double? midheaven;
+
+  ChartData(
+    this.housePlanets,
+    this.planetLongitudes,
+    this.ascendantSidereal,
+    this.jd, {
+    this.planetSpeeds = const {},
+    this.ayanamsa = 0,
+    this.lat = 0,
+    this.lon = 0,
+    this.utcOffset = 0,
+    this.planetLatitudes = const {},
+    this.declinations = const {},
+    this.heliocentricLongitudes = const {},
+    this.midheaven,
+  });
+
+  /// 0-based sign index of the ascendant (0 = Aries).
+  int get lagnaRashi => (ascendantSidereal / 30).floor() % 12;
+
+  /// Rahu/Ketu are always retrograde in mean motion, so they are excluded.
+  bool isRetrograde(String planet) =>
+      planet != 'rahu' && planet != 'ketu' && (planetSpeeds[planet] ?? 0) < 0;
 }
 
+enum Ayanamsa { lahiri, krishnamurti }
+
+/// Swiss Ephemeris backed astronomical engine.
+///
+/// All positions come from the Swiss Ephemeris (`sweph` package) using the
+/// bundled `sepl_18.se1` / `semo_18.se1` files (1800-2400 CE). Outside that
+/// range Swiss Ephemeris transparently falls back to its built-in Moshier
+/// ephemeris, so calculations never need a network connection.
 class Ephemeris {
-  // Julian Day
+  static bool _initialized = false;
+  static bool get isInitialized => _initialized;
+
+  /// Bundled ephemeris files shipped with the sweph package.
+  static const List<String> bundledEpheAssets = [
+    'packages/sweph/assets/ephe/sepl_18.se1',
+    'packages/sweph/assets/ephe/semo_18.se1',
+    'packages/sweph/assets/ephe/seleapsec.txt',
+  ];
+
+  /// Must be awaited once before any calculation.
+  static Future<void> init({
+    required AssetLoader assetLoader,
+    required String epheFilesPath,
+    List<String> epheAssets = bundledEpheAssets,
+    String? modulePath,
+  }) async {
+    if (_initialized) return;
+    await Sweph.init(
+      modulePath: modulePath,
+      epheAssets: epheAssets,
+      assetLoader: assetLoader,
+      epheFilesPath: epheFilesPath,
+    );
+    _initialized = true;
+  }
+
+  static const Map<String, HeavenlyBody> _bodies = {
+    'sun': HeavenlyBody.SE_SUN,
+    'moon': HeavenlyBody.SE_MOON,
+    'mars': HeavenlyBody.SE_MARS,
+    'mercury': HeavenlyBody.SE_MERCURY,
+    'jupiter': HeavenlyBody.SE_JUPITER,
+    'venus': HeavenlyBody.SE_VENUS,
+    'saturn': HeavenlyBody.SE_SATURN,
+  };
+
+  static const List<String> planetOrder = [
+    'sun', 'moon', 'mars', 'mercury', 'jupiter', 'venus', 'saturn', 'rahu', 'ketu'
+  ];
+
+  static const Map<String, String> planetAbbreviations = {
+    'sun': 'Su', 'moon': 'Mo', 'mars': 'Ma', 'mercury': 'Me',
+    'jupiter': 'Ju', 'venus': 'Ve', 'saturn': 'Sa',
+    'rahu': 'Ra', 'ketu': 'Ke'
+  };
+
+  static final SwephFlag _siderealFlags =
+      SwephFlag.SEFLG_SWIEPH | SwephFlag.SEFLG_SPEED | SwephFlag.SEFLG_SIDEREAL;
+  static final SwephFlag _equatorialFlags = SwephFlag.SEFLG_SWIEPH | SwephFlag.SEFLG_EQUATORIAL;
+  static final SwephFlag _helioFlags = SwephFlag.SEFLG_SWIEPH | SwephFlag.SEFLG_HELCTR | SwephFlag.SEFLG_SIDEREAL;
+
+  /// Description of the astronomical conventions, for audit logs.
+  static const String ephemerisLabel = 'Swiss Ephemeris (sweph 2.10.3), sepl_18/semo_18 files, Moshier fallback';
+
+  /// Sidereal mode used for "Lahiri" charts (configurable in Settings).
+  static String ayanamsaCode = 'LAHIRI';
+
+  /// Use the true (osculating) node instead of the mean node for Rahu/Ketu.
+  static bool trueNode = false;
+
+  static const Map<String, (SiderealMode, String)> ayanamsaModes = {
+    'LAHIRI': (SiderealMode.SE_SIDM_LAHIRI, 'Lahiri (Chitrapaksha, Swiss Ephemeris default)'),
+    'LAHIRI_ICRC': (SiderealMode.SE_SIDM_LAHIRI_ICRC, 'Lahiri ICRC (Indian Calendar Reform Committee)'),
+    'LAHIRI_1940': (SiderealMode.SE_SIDM_LAHIRI_1940, 'Lahiri 1940'),
+    'TRUE_CHITRA': (SiderealMode.SE_SIDM_TRUE_CITRA, 'True Chitrapaksha (Spica at 180°)'),
+    'RAMAN': (SiderealMode.SE_SIDM_RAMAN, 'B. V. Raman'),
+    'YUKTESHWAR': (SiderealMode.SE_SIDM_YUKTESHWAR, 'Sri Yukteshwar'),
+  };
+
+  /// Applies the calculation conventions chosen in Settings.
+  static void configure({String? ayanamsa, bool? trueNode}) {
+    if (ayanamsa != null && ayanamsaModes.containsKey(ayanamsa)) ayanamsaCode = ayanamsa;
+    if (trueNode != null) Ephemeris.trueNode = trueNode;
+  }
+
+  static String get nodeModel => trueNode ? 'True (osculating) lunar node' : 'Mean lunar node';
+  static String get ayanamsaLabel => '${ayanamsaModes[ayanamsaCode]!.$2}; Krishnamurti for KP';
+  static HeavenlyBody get _nodeBody => trueNode ? HeavenlyBody.SE_TRUE_NODE : HeavenlyBody.SE_MEAN_NODE;
+
+  static double _norm360(double d) {
+    final x = d % 360;
+    return x < 0 ? x + 360 : x;
+  }
+
+  /// Julian day (Gregorian calendar). Hours outside 0-24 are allowed, which
+  /// makes it convenient to pass `localHour - utcOffset` directly.
   static double julianDay(int year, int month, int day, [double hour = 12, double minute = 0, double second = 0]) {
     if (month <= 2) {
       year -= 1;
       month += 12;
     }
-    final int A = (year / 100).floor();
-    final int B = 2 - A + (A / 4).floor();
+    final int a = (year / 100).floor();
+    final int b = 2 - a + (a / 4).floor();
     return (365.25 * (year + 4716)).floor() +
         (30.6001 * (month + 1)).floor() +
         day +
-        B -
+        b -
         1524.5 +
         (hour + minute / 60 + second / 3600) / 24;
   }
 
-  static double _toRad(double d) => d * math.pi / 180;
-  static double _toDeg(double r) => r * 180 / math.pi;
-  static double _norm360(double d) {
-    double x = d % 360;
-    return x < 0 ? x + 360 : x;
+  /// Julian day (UT) for a local wall-clock time at the given UTC offset.
+  static double julianDayFromLocal(DateTime local, double utcOffset) {
+    return julianDay(local.year, local.month, local.day,
+        local.hour - utcOffset, local.minute.toDouble(), local.second.toDouble());
   }
 
-  // Lahiri Ayanamsa
-  static double lahiriAyanamsa(double jd) {
-    final double T = (jd - 2451545.0) / 36525;
-    return _norm360(23.85064 + 1.39675 * T + 0.000139 * T * T);
+  static double nowJd() {
+    final now = DateTime.now().toUtc();
+    return julianDay(now.year, now.month, now.day, now.hour.toDouble(), now.minute.toDouble(), now.second.toDouble());
   }
 
-  // Kepler solver
-  static double _keplerSolve(double mRad, double e) {
-    double E = mRad;
-    for (int i = 0; i < 12; i++) {
-      double dE = (mRad - E + e * math.sin(E)) / (1 - e * math.cos(E));
-      E += dE;
-      if (dE.abs() < 1e-9) break;
+  /// Converts a Julian day to a UTC [DateTime].
+  static DateTime jdToUtc(double jd) {
+    final ms = ((jd - 2440587.5) * 86400000).round();
+    return DateTime.fromMillisecondsSinceEpoch(ms, isUtc: true);
+  }
+
+  static void _setAyanamsa(Ayanamsa mode) {
+    Sweph.swe_set_sid_mode(
+      mode == Ayanamsa.krishnamurti ? SiderealMode.SE_SIDM_KRISHNAMURTI : ayanamsaModes[ayanamsaCode]!.$1,
+    );
+  }
+
+  static double ayanamsaValue(double jdUt, [Ayanamsa mode = Ayanamsa.lahiri]) {
+    _setAyanamsa(mode);
+    return Sweph.swe_get_ayanamsa_ex_ut(jdUt, SwephFlag.SEFLG_SWIEPH);
+  }
+
+  /// Sidereal longitude and speed of a planet (including 'rahu'/'ketu').
+  static (double, double) siderealPosition(String planet, double jdUt, [Ayanamsa mode = Ayanamsa.lahiri]) {
+    _setAyanamsa(mode);
+    if (planet == 'rahu' || planet == 'ketu') {
+      final node = Sweph.swe_calc_ut(jdUt, _nodeBody, _siderealFlags);
+      final lon = planet == 'rahu' ? node.longitude : _norm360(node.longitude + 180);
+      return (lon, node.speedInLongitude);
     }
-    return E;
+    final body = _bodies[planet];
+    if (body == null) throw ArgumentError('Unknown planet $planet');
+    final pos = Sweph.swe_calc_ut(jdUt, body, _siderealFlags);
+    return (_norm360(pos.longitude), pos.speedInLongitude);
   }
 
-  // Sun
-  static double sunLongitude(double T) {
-    double l0 = _norm360(280.46646 + 36000.76983 * T + 3.032e-4 * T * T);
-    double m = _norm360(357.52911 + 35999.05029 * T - 1.537e-4 * T * T);
-    double mR = _toRad(m);
-    double C = (1.914602 - 0.004817 * T - 1.4e-5 * T * T) * math.sin(mR) +
-        (0.019993 - 1.01e-4 * T) * math.sin(2 * mR) +
-        2.89e-4 * math.sin(3 * mR);
-    double om = _norm360(125.04 - 1934.136 * T);
-    return _norm360(l0 + C - 0.00569 - 0.00478 * math.sin(_toRad(om)));
+  /// Ecliptic latitude of a body (degrees). Mean nodes have zero latitude.
+  static double eclipticLatitude(String planet, double jdUt) {
+    final body = _bodies[planet];
+    if (body == null) return 0;
+    return Sweph.swe_calc_ut(jdUt, body, _siderealFlags).latitude;
   }
 
-  static double sunDistance(double T) {
-    double m = _toRad(_norm360(357.52911 + 35999.05029 * T));
-    double e = 0.016708634 - 4.2037e-5 * T;
-    double E = _keplerSolve(m, e);
-    return 1.000001018 * (1 - e * math.cos(E));
-  }
-
-  // Moon
-  static double moonLongitude(double T) {
-    double lp = _norm360(218.3164477 + 481267.88123421 * T - 0.0015786 * T * T + T * T * T / 538841);
-    double d = _norm360(297.8501921 + 445267.1114034 * T - 0.0018819 * T * T + T * T * T / 545868);
-    double m = _norm360(357.5291092 + 35999.0502909 * T - 0.0001536 * T * T);
-    double mp = _norm360(134.9633964 + 477198.8675055 * T + 0.0087414 * T * T + T * T * T / 69699);
-    double f = _norm360(93.2720950 + 483202.0175233 * T - 0.0036539 * T * T);
-    double dr = _toRad(d), mr = _toRad(m), mpr = _toRad(mp), fr = _toRad(f);
-    double e = 1 - 0.002516 * T - 0.0000074 * T * T;
-
-    const terms = [
-      [0, 0, 1, 0, 6288774], [2, 0, -1, 0, 1274027], [2, 0, 0, 0, 658314], [0, 0, 2, 0, 213618],
-      [0, 1, 0, 0, -185116], [0, 0, 0, 2, -114332], [2, 0, -2, 0, 58793], [2, -1, -1, 0, 57066],
-      [2, 0, 1, 0, 53322], [2, -1, 0, 0, 45758], [0, 1, -1, 0, -40923], [1, 0, 0, 0, -34720],
-      [0, 1, 1, 0, -30383], [2, 0, 0, -2, 15327], [0, 0, 1, 2, -12528], [0, 0, 1, -2, 10980],
-      [4, 0, -1, 0, 10675], [0, 0, 3, 0, 10034], [4, 0, -2, 0, 8548], [2, 1, -1, 0, -7888],
-      [2, 1, 0, 0, -6766], [1, 0, -1, 0, -5163], [1, 1, 0, 0, 4987], [2, -1, 1, 0, 4036],
-      [2, 0, 2, 0, 3994], [4, 0, 0, 0, 3861], [2, 0, -3, 0, 3665], [0, 1, -2, 0, -2689],
-      [2, -1, -2, 0, 2390], [1, 0, 1, 0, -2348], [2, -2, 0, 0, 2236], [0, 1, 2, 0, -2120],
-      [0, 2, 0, 0, -2069], [2, -2, -1, 0, 2048], [2, 0, 1, -2, -1773], [2, 0, 0, 2, -1595],
-      [4, -1, -1, 0, 1215], [0, 0, 2, 2, -1110], [3, 0, -1, 0, -892], [2, 1, 1, 0, -810],
-    ];
-
-    double sl = 0;
-    for (var term in terms) {
-      double arg = term[0] * dr + term[1] * mr + term[2] * mpr + term[3] * fr;
-      double c = term[4] * math.sin(arg);
-      if (term[1].abs() == 1) c *= e;
-      if (term[1].abs() == 2) c *= e * e;
-      sl += c;
+  /// Tropical declination of a body (degrees).
+  static double declination(String planet, double jdUt) {
+    if (planet == 'rahu' || planet == 'ketu') {
+      final node = Sweph.swe_calc_ut(jdUt, _nodeBody, _equatorialFlags);
+      return planet == 'rahu' ? node.latitude : -node.latitude;
     }
-    return _norm360(lp + sl / 1e6);
+    final body = _bodies[planet];
+    if (body == null) return 0;
+    return Sweph.swe_calc_ut(jdUt, body, _equatorialFlags).latitude;
   }
 
-  // Planets via orbital elements
-  static const Map<String, List<double>> _elements = {
-    'mercury': [252.250906, 149472.6746358, 0.20563069, -2.52e-5, 7.004986, -5.99e-3, 48.330893, -1.2543e-1, 77.456119, 1.5886e-1, 0.387098],
-    'venus': [181.979801, 58517.815676, 0.00677323, -4.938e-5, 3.394662, -8.568e-4, 76.679920, -2.7801e-1, 131.563703, 4.8746e-3, 0.723330],
-    'mars': [355.433275, 19140.299331, 0.09341233, 1.19e-5, 1.849726, -6.011e-4, 49.558093, -1.0203e0, 336.060234, 4.4390e-1, 1.523679],
-    'jupiter': [34.351484, 3034.905675, 0.04839266, -1.29e-4, 1.303270, -1.987e-3, 100.464441, 1.7688e-1, 14.331309, 2.1555e-1, 5.202603],
-    'saturn': [50.077444, 1222.113849, 0.05415060, -3.68e-4, 2.488878, 2.552e-3, 113.665524, -2.567e-1, 93.057136, 5.665e-1, 9.536676],
-  };
-
-  static Map<String, double> _getHelioCoords(double T, List<double> el) {
-    double l = _norm360(el[0] + el[1] * T);
-    double e = el[2] + el[3] * T;
-    double w = _norm360(el[8] + el[9] * T);
-    double m = _norm360(l - w);
-    double E = _keplerSolve(_toRad(m), e);
-    double v = _toDeg(2 * math.atan2(math.sqrt(1 + e) * math.sin(E / 2), math.sqrt(1 - e) * math.cos(E / 2)));
-    double pLong = _norm360(v + w);
-    double pDist = el[10] * (1 - e * math.cos(E));
-    return {'pLong': pLong, 'pDist': pDist};
+  /// Sidereal heliocentric longitude of a planet (Mars to Saturn, Mercury, Venus).
+  static double? heliocentricLongitude(String planet, double jdUt, [Ayanamsa mode = Ayanamsa.lahiri]) {
+    if (planet == 'sun' || planet == 'moon' || planet == 'rahu' || planet == 'ketu') return null;
+    final body = _bodies[planet];
+    if (body == null) return null;
+    _setAyanamsa(mode);
+    return _norm360(Sweph.swe_calc_ut(jdUt, body, _helioFlags).longitude);
   }
 
-  static double _helioToGeo(double pLong, double pDist, double sLong, double sDist) {
-    double dp = _toRad(pLong - sLong);
-    double x = pDist * math.cos(dp) + sDist;
-    double y = pDist * math.sin(dp);
-    return _norm360(_toDeg(math.atan2(y, x)) + sLong);
+  /// Sidereal Midheaven (MC).
+  static double midheavenLongitude(double jdUt, double lat, double lon, [Ayanamsa mode = Ayanamsa.lahiri]) {
+    _setAyanamsa(mode);
+    final houses = Sweph.swe_houses_ex(jdUt, SwephFlag.SEFLG_SIDEREAL, lat, lon, Hsys.E);
+    return _norm360(houses.ascmc[1]);
   }
 
-  static double _getGeoLong(String name, double T) {
-    if (name == 'sun') return sunLongitude(T);
-    if (name == 'moon') return moonLongitude(T);
+  static double siderealLongitude(String planet, double jdUt, [Ayanamsa mode = Ayanamsa.lahiri]) =>
+      siderealPosition(planet, jdUt, mode).$1;
 
-    final el = _elements[name]!;
-    final sLong = sunLongitude(T);
-    final sDist = sunDistance(T);
-    final helio = _getHelioCoords(T, el);
-
-    return _helioToGeo(helio['pLong']!, helio['pDist']!, sLong, sDist);
+  /// Sidereal ascendant for the given moment and place.
+  static double ascendant(double jdUt, double lat, double lon, [Ayanamsa mode = Ayanamsa.lahiri]) {
+    _setAyanamsa(mode);
+    final houses = Sweph.swe_houses_ex(jdUt, SwephFlag.SEFLG_SIDEREAL, lat, lon, Hsys.E);
+    return _norm360(houses.ascmc[0]);
   }
 
-  // Rahu
-  static double rahuLongitude(double T) {
-    double n = _norm360(125.0445479 - 1934.1362608 * T + 0.0020754 * T * T + T * T * T / 467441);
-    double d = _toRad(_norm360(297.8501921 + 445267.1114034 * T));
-    double m = _toRad(_norm360(357.5291092 + 35999.0502909 * T));
-    double mp = _toRad(_norm360(134.9633964 + 477198.8675055 * T));
-    double f = _toRad(_norm360(93.2720950 + 483202.0175233 * T));
-    n += -1.4979 * math.sin(2 * (d - f)) -
-        0.1500 * math.sin(m) -
-        0.1226 * math.sin(2 * d) +
-        0.1176 * math.sin(2 * f) -
-        0.0801 * math.sin(2 * (mp - f));
-    return _norm360(n);
+  /// Sidereal Placidus cusps. Index 1..12 hold cusps 1..12 (index 0 unused).
+  /// Swiss Ephemeris falls back to Porphyry near the poles where Placidus is undefined.
+  static List<double> placidusCusps(double jdUt, double lat, double lon, [Ayanamsa mode = Ayanamsa.krishnamurti]) {
+    _setAyanamsa(mode);
+    final houses = Sweph.swe_houses_ex(jdUt, SwephFlag.SEFLG_SIDEREAL, lat, lon, Hsys.P);
+    return [0.0, ...houses.cusps.sublist(1, 13).map(_norm360)];
   }
 
-  // Ascendant
-  static double ascendant(double jd, double lat, double lon) {
-    double T = (jd - 2451545.0) / 36525;
-    double gmst = _norm360(280.46061837 + 360.98564736629 * (jd - 2451545) + 0.000387933 * T * T);
-    double lst = _norm360(gmst + lon);
-    double ramc = _toRad(lst);
-    double eps = _toRad(23.4392911 - 0.013004 * T);
-    double latR = _toRad(lat);
-
-    double num = math.cos(ramc);
-    double den = -math.sin(ramc) * math.cos(eps) - math.tan(latR) * math.sin(eps);
-
-    return _norm360(_toDeg(math.atan2(num, den)));
-  }
-
-  // Generate house map directly for KundliChart
+  /// Birth chart for a local date/time with a fixed UTC offset (hours).
   static ChartData computeChart(
-      int year, int month, int day, double hour, double minute, double lat, double lon, double utcOffset) {
-    
-    double utcH = hour - utcOffset;
-    double jd = julianDay(year, month, day, utcH, minute, 0);
-    double T = (jd - 2451545.0) / 36525;
-    double ayan = lahiriAyanamsa(jd);
+      int year, int month, int day, double hour, double minute, double lat, double lon, double utcOffset,
+      [Ayanamsa mode = Ayanamsa.lahiri]) {
+    final jd = julianDay(year, month, day, hour - utcOffset, minute, 0);
+    return computeChartForJd(jd, lat, lon, utcOffset: utcOffset, mode: mode);
+  }
 
-    // Calculate Ascendant (Lagna)
-    double ascTrop = ascendant(jd, lat, lon);
-    double ascSid = _norm360(ascTrop - ayan);
-    int lagnaSign = (ascSid / 30).floor() + 1; // 1=Aries, 2=Taurus...
-
-    // Calculate Planets
-    final List<String> planNames = ['sun', 'moon', 'mars', 'mercury', 'jupiter', 'venus', 'saturn'];
-    final Map<String, double> siderealLongs = {};
-
-    for (var name in planNames) {
-      double tropical = _getGeoLong(name, T);
-      siderealLongs[name] = _norm360(tropical - ayan);
+  static ChartData computeChartForJd(double jdUt, double lat, double lon,
+      {double utcOffset = 0, Ayanamsa mode = Ayanamsa.lahiri}) {
+    final Map<String, double> longs = {};
+    final Map<String, double> speeds = {};
+    for (final name in planetOrder) {
+      final (l, s) = siderealPosition(name, jdUt, mode);
+      longs[name] = l;
+      speeds[name] = s;
     }
 
-    // Rahu and Ketu
-    double rahuTrop = rahuLongitude(T);
-    siderealLongs['rahu'] = _norm360(rahuTrop - ayan);
-    siderealLongs['ketu'] = _norm360(rahuTrop - ayan + 180);
-
-    // Map to 12 Houses
-    Map<int, List<String>> housePlanets = {};
-    for (int i = 1; i <= 12; i++) {
-      housePlanets[i] = [];
-    }
-
-    final Map<String, String> planetDisplayNames = {
-      'sun': 'Su', 'moon': 'Mo', 'mars': 'Ma', 'mercury': 'Me',
-      'jupiter': 'Ju', 'venus': 'Ve', 'saturn': 'Sa',
-      'rahu': 'Ra', 'ketu': 'Ke'
+    final ascSid = ascendant(jdUt, lat, lon, mode);
+    final lagnaSign = (ascSid / 30).floor();
+    final lats = {for (final n in planetOrder) n: eclipticLatitude(n, jdUt)};
+    final decls = {for (final n in planetOrder) n: declination(n, jdUt)};
+    final helio = <String, double>{
+      for (final n in planetOrder) n: ?heliocentricLongitude(n, jdUt, mode),
     };
+    final mc = midheavenLongitude(jdUt, lat, lon, mode);
 
-    siderealLongs.forEach((name, longitude) {
-      int planetSign = (longitude / 30).floor() + 1;
-      // Formula: House = (PlanetSign - LagnaSign + 12) % 12 + 1
-      int house = (planetSign - lagnaSign + 12) % 12 + 1;
-      housePlanets[house]!.add(planetDisplayNames[name]!);
+    final Map<int, List<String>> housePlanets = {for (int i = 1; i <= 12; i++) i: []};
+    longs.forEach((name, longitude) {
+      final planetSign = (longitude / 30).floor();
+      final house = (planetSign - lagnaSign + 12) % 12 + 1;
+      housePlanets[house]!.add(planetAbbreviations[name]!);
     });
 
-    return ChartData(housePlanets, siderealLongs, ascSid, jd);
+    return ChartData(
+      housePlanets,
+      longs,
+      ascSid,
+      jdUt,
+      planetSpeeds: speeds,
+      ayanamsa: ayanamsaValue(jdUt, mode),
+      lat: lat,
+      lon: lon,
+      utcOffset: utcOffset,
+      planetLatitudes: lats,
+      declinations: decls,
+      heliocentricLongitudes: helio,
+      midheaven: mc,
+    );
+  }
+
+  /// Next sunrise (UT Julian day) after [jdUt]; null in polar day/night.
+  static double? nextSunrise(double jdUt, double lat, double lon) => _riseSet(jdUt, lat, lon, RiseSetTransitFlag.SE_CALC_RISE);
+
+  /// Next sunset (UT Julian day) after [jdUt]; null in polar day/night.
+  static double? nextSunset(double jdUt, double lat, double lon) => _riseSet(jdUt, lat, lon, RiseSetTransitFlag.SE_CALC_SET);
+
+  /// Next upper meridian transit of the Sun (local apparent noon) after [jdUt].
+  static double? nextSunTransit(double jdUt, double lat, double lon) => _riseSet(jdUt, lat, lon, RiseSetTransitFlag.SE_CALC_MTRANSIT);
+
+  static double? _riseSet(double jdUt, double lat, double lon, RiseSetTransitFlag flag) {
+    try {
+      return Sweph.swe_rise_trans(
+        jdUt,
+        HeavenlyBody.SE_SUN,
+        SwephFlag.SEFLG_SWIEPH,
+        flag,
+        GeoPosition(lon, lat, 0),
+        1013.25,
+        15,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Finds the moment near [approxJd] when the sidereal Sun reaches [targetLongitude].
+  static double findSunLongitude(double targetLongitude, double approxJd, [Ayanamsa mode = Ayanamsa.lahiri]) {
+    double jd = approxJd;
+    for (int i = 0; i < 20; i++) {
+      final (lon, speed) = siderealPosition('sun', jd, mode);
+      double diff = targetLongitude - lon;
+      if (diff > 180) diff -= 360;
+      if (diff < -180) diff += 360;
+      if (diff.abs() < 1e-7) break;
+      jd += diff / (speed == 0 ? 0.9856 : speed);
+    }
+    return jd;
   }
 }

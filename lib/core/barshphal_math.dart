@@ -28,90 +28,49 @@ class BarshphalData {
 }
 
 class BarshphalMath {
-  static BarshphalData compute(ChartData natalChart, int birthYear, int currentYear, double lat, double lon) {
-    int age = currentYear - birthYear;
+  /// Sidereal year length in days, used to seed the solar-return search.
+  static const double siderealYear = 365.256363;
+
+  /// Completed years of life at [jd] (the age whose Varsha is running).
+  static int currentAge(ChartData natal, [double? jd]) {
+    final double now = jd ?? Ephemeris.nowJd();
+    int age = ((now - natal.jd) / siderealYear).floor();
+    if (age < 0) return 0;
+    // Adjust across the boundary using the exact solar return.
+    if (solarReturnJd(natal, age + 1) <= now) age += 1;
+    if (age > 0 && solarReturnJd(natal, age) > now) age -= 1;
+    return age;
+  }
+
+  /// Exact moment the sidereal Sun returns to its natal longitude for [age].
+  static double solarReturnJd(ChartData natal, int age) {
+    final double natalSun = natal.planetLongitudes['sun']!;
+    return Ephemeris.findSunLongitude(natalSun, natal.jd + age * siderealYear);
+  }
+
+  /// Varshaphal (annual chart) for the year starting at [age] completed years,
+  /// cast for the given place (defaults to the birth place).
+  static BarshphalData compute(ChartData natalChart, int age, {double? lat, double? lon, double? utcOffset}) {
     if (age < 0) age = 0;
+    final double placeLat = lat ?? natalChart.lat;
+    final double placeLon = lon ?? natalChart.lon;
+    final double offset = utcOffset ?? natalChart.utcOffset;
 
-    double natalSun = natalChart.planetLongitudes['sun']!;
-    double natalJD = natalChart.jd;
+    final double srJD = solarReturnJd(natalChart, age);
+    final ChartData srChart = Ephemeris.computeChartForJd(srJD, placeLat, placeLon, utcOffset: offset);
+    final int yearLagnaRashi = srChart.lagnaRashi;
 
-    // Estimate Solar Return JD
-    double approxJD = natalJD + age * 365.242199;
-    
-    // Binary Search to find the exact Solar Return JD
-    double lowJD = approxJD - 2.0;
-    double highJD = approxJD + 2.0;
-    double srJD = approxJD;
+    // Muntha advances one sign per completed year from the natal Lagna.
+    final int muntha = (natalChart.lagnaRashi + age) % 12;
 
-    for (int i = 0; i < 40; i++) {
-      double midJD = (lowJD + highJD) / 2;
-      double T = (midJD - 2451545.0) / 36525;
-      double ayan = Ephemeris.lahiriAyanamsa(midJD);
-      double currentSun = VedicMath.norm360(Ephemeris.sunLongitude(T) - ayan);
-
-      double diff = currentSun - natalSun;
-      if (diff > 180) diff -= 360;
-      if (diff < -180) diff += 360;
-
-      if (diff > 0) {
-        highJD = midJD;
-      } else {
-        lowJD = midJD;
-      }
-      srJD = midJD;
-      if (diff.abs() < 0.00001) break;
-    }
-
-    // Compute the Solar Return Chart
-    // Reverse JD to year, month, day, hour. This is a bit complex but we can approximate or use jd directly for ascendant.
-    double T_sr = (srJD - 2451545.0) / 36525;
-    double ayan_sr = Ephemeris.lahiriAyanamsa(srJD);
-    double ascTrop = Ephemeris.ascendant(srJD, lat, lon);
-    double ascSid = VedicMath.norm360(ascTrop - ayan_sr);
-    int yearLagnaRashi = (ascSid / 30).floor();
-
-    Map<String, double> srPlanets = {};
-    for (var pName in ['sun', 'moon', 'mars', 'mercury', 'jupiter', 'venus', 'saturn']) {
-      double trop = pName == 'sun' ? Ephemeris.sunLongitude(T_sr) : (pName == 'moon' ? Ephemeris.moonLongitude(T_sr) : Ephemeris.sunLongitude(T_sr)); 
-      // Need proper geocentric coords for the rest. We'll use a hack or recreate computeChart from JD.
-      // Since computeChart takes Y,M,D,H,M, it's easier to just compute JD->Date.
-    }
-
-    // Convert JD to Date exactly
-    int z = (srJD + 0.5).floor();
-    double f = (srJD + 0.5) - z;
-    int a = z < 2299161 ? z : (() {
-      int aa = ((z - 1867216.25) / 36524.25).floor();
-      return z + 1 + aa - (aa / 4).floor();
-    })();
-    int b = a + 1524;
-    int c = ((b - 122.1) / 365.25).floor();
-    int d = (365.25 * c).floor();
-    int e = ((b - d) / 30.6001).floor();
-    int day = b - d - (30.6001 * e).floor();
-    int month = e < 14 ? e - 1 : e - 13;
-    int year = month > 2 ? c - 4716 : c - 4715;
-
-    double fractionalDay = f;
-    double hours = fractionalDay * 24;
-    int h = hours.floor();
-    double minutes = (hours - h) * 60;
-    int m = minutes.floor();
-
-    // Use UTC offset 0 for JD -> UTC Chart
-    ChartData srChart = Ephemeris.computeChart(year, month, day, h.toDouble(), m.toDouble(), lat, lon, 0);
-
-    // Recalculate year lagna from standard chart
-    yearLagnaRashi = (srChart.ascendantSidereal / 30).floor();
-
-    // Muntha = (Natal Lagna + Age) % 12
-    int natalLagna = (natalChart.ascendantSidereal / 30).floor();
-    int muntha = (natalLagna + age) % 12;
+    final local = Ephemeris.jdToUtc(srJD).add(Duration(minutes: (offset * 60).round()));
+    String two(int v) => v.toString().padLeft(2, '0');
+    final String offsetLabel = 'UTC${offset >= 0 ? '+' : '-'}${_formatOffset(offset.abs())}';
 
     return BarshphalData(
       age: age,
       solarReturnJD: srJD,
-      solarReturnDate: "\$year-\$month-\$day \$h:\$m UTC",
+      solarReturnDate: '${local.year}-${two(local.month)}-${two(local.day)} ${two(local.hour)}:${two(local.minute)} ($offsetLabel)',
       munthaRashi: muntha,
       munthaRashiData: VedicMath.rashis[muntha],
       munthaLord: VedicMath.planets[VedicMath.rashis[muntha].lord]!,
@@ -120,5 +79,10 @@ class BarshphalMath {
       yearLagnaLord: VedicMath.planets[VedicMath.rashis[yearLagnaRashi].lord]!,
       varshaphalChart: srChart,
     );
+  }
+
+  static String _formatOffset(double hours) {
+    final int mins = (hours * 60).round();
+    return '${mins ~/ 60}:${(mins % 60).toString().padLeft(2, '0')}';
   }
 }

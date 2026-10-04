@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/database_provider.dart';
+import '../../widgets/ai_sheet.dart';
+import '../../core/l10n.dart';
 
 class InterpretationScreen extends ConsumerWidget {
   final int? profileId;
@@ -11,8 +13,13 @@ class InterpretationScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     if (profileId == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('AI Interpretation')),
-        body: const Center(child: Text('This Kundali is not saved yet. Please save it to view AI interpretations.')),
+        appBar: AppBar(title: Text(tr('AI Interpretation', 'AI विश्लेषण'))),
+        body: Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text(tr('This Kundali is not saved yet. Please save it to view AI interpretations.', 'यह कुंडली अभी सहेजी नहीं गई है। AI विश्लेषण देखने के लिए इसे सहेजें।'), textAlign: TextAlign.center),
+          ),
+        ),
       );
     }
 
@@ -28,14 +35,15 @@ class InterpretationScreen extends ConsumerWidget {
         final text = profile.aiInterpretation;
         
         return Scaffold(
-          appBar: AppBar(title: Text('Interpretations for ${profile.name}', style: const TextStyle(fontSize: 18))),
+          appBar: AppBar(title: Text(tr('Interpretations', 'विश्लेषण'))),
           body: () {
             if (text == null || text.isEmpty) {
             return Center(
               child: Padding(
                 padding: const EdgeInsets.all(24.0),
                 child: Text(
-                  'No AI interpretation has been saved for this profile yet.\n\nGo back and tap on any house in the Kundali Chart to generate an interpretation, then click "Save Interpretation to Profile".',
+                  tr('No AI interpretation has been saved for this profile yet.\n\nGo back and tap on any house in the Kundali Chart to generate an interpretation, then click "Save Interpretation to Profile".',
+                      'इस प्रोफ़ाइल के लिए अभी कोई AI विश्लेषण सहेजा नहीं गया है।\n\nवापस जाएँ और कुंडली चार्ट में किसी भाव पर टैप करके विश्लेषण बनाएँ, फिर "विश्लेषण प्रोफ़ाइल में सहेजें" दबाएँ।'),
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 16),
                 ),
@@ -53,7 +61,7 @@ class InterpretationScreen extends ConsumerWidget {
               if (interp.isEmpty) return const SizedBox.shrink();
               
               final lines = interp.split('\n');
-              String title = 'Interpretation ${index + 1}';
+              String title = '${tr('Interpretation', 'विश्लेषण')} ${index + 1}';
               String body = interp;
 
               if (lines.isNotEmpty) {
@@ -81,14 +89,7 @@ class InterpretationScreen extends ConsumerWidget {
                   children: [
                     Padding(
                       padding: const EdgeInsets.all(16.0),
-                      child: SelectableText(
-                        body,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurface,
-                          fontSize: 15,
-                          height: 1.5,
-                        ),
-                      ),
+                      child: AiMarkdown(body),
                     ),
                   ],
                 ),

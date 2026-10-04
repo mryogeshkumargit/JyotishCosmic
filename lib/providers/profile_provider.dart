@@ -2,11 +2,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart';
 import '../core/database.dart';
 import '../providers/database_provider.dart';
-import '../services/sync_service.dart';
+import '../providers/sync_provider.dart';
 
-final profileListProvider = FutureProvider<List<Profile>>((ref) async {
+/// All saved profiles. Backed by a drift query stream so every screen updates
+/// as soon as the local database changes (including changes pulled by sync).
+final profileListProvider = StreamProvider<List<Profile>>((ref) {
   final db = ref.watch(databaseProvider);
-  return await db.select(db.profiles).get();
+  return (db.select(db.profiles)..orderBy([(t) => OrderingTerm.asc(t.name)])).watch();
 });
 
 final editProfileProvider = NotifierProvider<EditProfileNotifier, Profile?>(EditProfileNotifier.new);
@@ -23,56 +25,59 @@ class ProfileNotifier extends Notifier<void> {
   @override
   void build() {}
 
-  Future<void> addProfile(String name, DateTime dob, String pob, double lat, double lon, double timezone) async {
-    try {
-      final db = ref.read(databaseProvider);
-      final syncService = ref.read(syncServiceProvider);
-      
-      await db.into(db.profiles).insert(ProfilesCompanion.insert(
-        name: name,
-        dob: dob,
-        pob: pob,
-        lat: lat,
-        lon: lon,
-        timezone: Value(timezone),
-        needsSync: const Value(true),
-      ));
-      
-      ref.invalidate(profileListProvider);
-      syncService.syncProfiles();
-    } catch (e) {
-      print("Error saving profile: $e");
-    }
+  void _sync() => ref.read(syncProvider.notifier).scheduleSync();
+
+  /// Inserts a profile and returns its id. [dob] must be a wall-clock time
+  /// encoded as UTC (see `encodeWallClock`).
+  Future<int> addProfile({
+    required String name,
+    required DateTime dob,
+    required String pob,
+    required double lat,
+    required double lon,
+    required double timezone,
+    String? tzName,
+    String? gender,
+  }) async {
+    final db = ref.read(databaseProvider);
+    final id = await db.into(db.profiles).insert(ProfilesCompanion.insert(
+      name: name,
+      dob: dob,
+      pob: pob,
+      lat: lat,
+      lon: lon,
+      timezone: Value(timezone),
+      tzName: Value(tzName),
+      gender: Value(gender),
+    ));
+    _sync();
+    return id;
   }
 
   Future<void> updateProfile(Profile profile) async {
     final db = ref.read(databaseProvider);
-    final syncService = ref.read(syncServiceProvider);
-
-    await db.update(db.profiles).replace(profile.copyWith(
-      updatedAt: DateTime.now(),
-      needsSync: true,
-    ));
-    
-    ref.invalidate(profileListProvider);
-    syncService.syncProfiles();
+    await db.update(db.profiles).replace(profile.copyWith(updatedAt: DateTime.now(), needsSync: true));
+    _sync();
   }
 
   Future<void> deleteProfile(Profile profile) async {
     final db = ref.read(databaseProvider);
-    final syncService = ref.read(syncServiceProvider);
-
-    await db.delete(db.profiles).delete(profile);
-    ref.invalidate(profileListProvider);
-    syncService.syncProfiles();
+    await db.transaction(() async {
+      // Remember uploaded profiles so the deletion reaches the server too.
+      if (profile.cloudflareId != null) {
+        await db.into(db.pendingDeletions).insertOnConflictUpdate(
+            PendingDeletionsCompanion.insert(cloudId: profile.cloudflareId!));
+      }
+      await db.delete(db.profiles).delete(profile);
+    });
+    _sync();
   }
 
+  /// Appends an AI interpretation to the profile's saved interpretations.
   Future<void> saveInterpretation(int profileId, String interpretation) async {
     final db = ref.read(databaseProvider);
-    final syncService = ref.read(syncServiceProvider);
-
     final profile = await (db.select(db.profiles)..where((t) => t.id.equals(profileId))).getSingle();
-    
+
     String newInterpretation = interpretation;
     if (profile.aiInterpretation != null && profile.aiInterpretation!.isNotEmpty) {
       newInterpretation = '${profile.aiInterpretation}\n\n---\n\n$interpretation';
@@ -85,8 +90,6 @@ class ProfileNotifier extends Notifier<void> {
         needsSync: const Value(true),
       ),
     );
-    
-    ref.invalidate(profileListProvider);
-    // syncService.syncProfiles(); // Temporarily disabled to prevent any possible sync overwrites
+    _sync();
   }
 }

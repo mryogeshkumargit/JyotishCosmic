@@ -1,18 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../theme/app_theme.dart';
-import '../widgets/kundli_chart.dart';
+import '../core/chart_summary.dart';
+import '../core/database.dart';
 import '../core/ephemeris.dart';
-import '../providers/settings_provider.dart';
-import '../services/ai_service.dart';
+import '../core/vedic_math.dart';
+import '../widgets/ai_sheet.dart';
+import '../widgets/kundli_chart.dart';
 import '../services/pdf_service.dart';
-import '../providers/profile_provider.dart';
 import 'tabs/graha_screen.dart';
 import 'tabs/dasha_screen.dart';
 import 'tabs/panchang_screen.dart';
 import 'tabs/yogas_screen.dart';
 import 'tabs/doshas_screen.dart';
-import 'tabs/generic_data_screen.dart';
 import 'tabs/varga_screen.dart';
 import 'tabs/transit_screen.dart';
 import 'tabs/nakshatra_screen.dart';
@@ -24,252 +23,213 @@ import 'tabs/interpretation_screen.dart';
 import 'tabs/ai_chat_screen.dart';
 import 'tabs/remedies_screen.dart';
 import 'tabs/predictions_screen.dart';
+import 'tabs/conjunctions_screen.dart';
+import 'tabs/strength_screen.dart';
+import 'tabs/ashtakavarga_screen.dart';
+import 'tabs/synthesis_screen.dart';
+import '../core/l10n.dart';
 
 class KundliResultScreen extends ConsumerStatefulWidget {
   final String name;
-  final DateTime date;
-  final TimeOfDay time;
+
+  /// Birth wall-clock time at the birth place (UTC-encoded, see Profiles.dob).
+  final DateTime birth;
   final double lat;
   final double lon;
   final double timezone;
+  final String? tzName;
+  final String? place;
+  final String? gender;
   final int? profileId;
 
   const KundliResultScreen({
     super.key,
     required this.name,
-    required this.date,
-    required this.time,
+    required this.birth,
     required this.lat,
     required this.lon,
     required this.timezone,
+    this.tzName,
+    this.place,
+    this.gender,
     this.profileId,
   });
+
+  factory KundliResultScreen.forProfile(Profile p) => KundliResultScreen(
+        name: p.name,
+        birth: p.dob.toUtc(),
+        lat: p.lat,
+        lon: p.lon,
+        timezone: p.timezone,
+        tzName: p.tzName,
+        place: p.pob,
+        gender: p.gender,
+        profileId: p.id,
+      );
+
+  /// Hindi titles of the feature buttons (the English title is the key).
+  static const Map<String, String> hindiTitles = {
+    'Synthesis': 'संश्लेषण', 'Planet': 'ग्रह', 'Dasha': 'दशा', 'Predictions': 'भविष्यफल', 'KP System': 'केपी पद्धति',
+    'Shodashvarga': 'षोडशवर्ग', 'Lal Kitab': 'लाल किताब', 'Barshphal': 'वर्षफल', 'Transit': 'गोचर', 'Nakshatra': 'नक्षत्र',
+    'Avasthas': 'अवस्थाएँ', 'Panchang': 'पंचांग', 'Dosha': 'दोष', 'Yogas': 'योग', 'Conjunctions': 'युति', 'Strength': 'ग्रह बल',
+    'Ashtakavarga': 'अष्टकवर्ग', 'Remedies': 'उपाय', 'Interpretation': 'फलादेश', 'Ask AI': 'AI से पूछें',
+  };
 
   @override
   ConsumerState<KundliResultScreen> createState() => _KundliResultScreenState();
 }
 
 class _KundliResultScreenState extends ConsumerState<KundliResultScreen> {
-  late ChartData _chartData;
+  late final ChartData _chartData;
 
-  final List<Map<String, dynamic>> _actionButtons = [
-    {'title': 'Planet', 'icon': Icons.public},
-    {'title': 'Dasha', 'icon': Icons.timeline},
-    {'title': 'Predictions', 'icon': Icons.auto_awesome},
-    {'title': 'KP System', 'icon': Icons.calculate},
-    {'title': 'Shodashvarga', 'icon': Icons.grid_view},
-    {'title': 'Lal Kitab', 'icon': Icons.menu_book},
-    {'title': 'Barshphal', 'icon': Icons.calendar_today},
-    {'title': 'Transit', 'icon': Icons.sync},
-    {'title': 'Nakshtra', 'icon': Icons.wb_twilight},
-    {'title': 'Planet Cons.', 'icon': Icons.balance},
-    {'title': 'Daily Panchang', 'icon': Icons.today},
-    {'title': 'Dosha', 'icon': Icons.warning_amber},
-    {'title': 'Yogas', 'icon': Icons.psychology},
-    {'title': 'Remedies', 'icon': Icons.healing},
-    {'title': 'Interpretation', 'icon': Icons.lightbulb_outline},
-    {'title': 'Ask AI', 'icon': Icons.chat_bubble_outline},
+  static const List<(String, IconData)> _actionButtons = [
+    ('Synthesis', Icons.hub),
+    ('Planet', Icons.public),
+    ('Dasha', Icons.timeline),
+    ('Predictions', Icons.auto_awesome),
+    ('KP System', Icons.calculate),
+    ('Shodashvarga', Icons.grid_view),
+    ('Lal Kitab', Icons.menu_book),
+    ('Barshphal', Icons.calendar_today),
+    ('Transit', Icons.sync),
+    ('Nakshatra', Icons.wb_twilight),
+    ('Avasthas', Icons.balance),
+    ('Panchang', Icons.today),
+    ('Dosha', Icons.warning_amber),
+    ('Yogas', Icons.psychology),
+    ('Conjunctions', Icons.join_inner),
+    ('Strength', Icons.fitness_center),
+    ('Ashtakavarga', Icons.grid_on),
+    ('Remedies', Icons.healing),
+    ('Interpretation', Icons.lightbulb_outline),
+    ('Ask AI', Icons.chat_bubble_outline),
   ];
+
 
   @override
   void initState() {
     super.initState();
-    _computeChart();
-  }
-
-  void _computeChart() {
+    final b = widget.birth;
     _chartData = Ephemeris.computeChart(
-      widget.date.year,
-      widget.date.month,
-      widget.date.day,
-      widget.time.hour.toDouble(),
-      widget.time.minute.toDouble(),
-      widget.lat,
-      widget.lon,
-      widget.timezone,
-    );
+        b.year, b.month, b.day, b.hour.toDouble(), b.minute.toDouble(), widget.lat, widget.lon, widget.timezone);
   }
 
-  void _showAIModal(String title, String prompt) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) {
-        return Container(
-          padding: const EdgeInsets.all(24),
-          height: MediaQuery.of(context).size.height * 0.7,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.auto_awesome, color: Theme.of(context).colorScheme.secondary),
-                  const SizedBox(width: 8),
-                  Text(title, style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 20, fontWeight: FontWeight.bold)),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Expanded(
-                child: FutureBuilder<String>(
-                  future: AiService.interpret(ref.read(settingsProvider), prompt),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return Center(child: CircularProgressIndicator(color: Theme.of(context).colorScheme.secondary));
-                    }
-                    if (snapshot.hasError) {
-                      return Center(child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.red)));
-                    }
-                    
-                    final text = snapshot.data ?? 'No response';
-                    
-                    return SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            text,
-                            style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 16, height: 1.5),
-                          ),
-                          const SizedBox(height: 20),
-                          if (widget.profileId != null)
-                            ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Theme.of(context).colorScheme.primary,
-                                foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                              ),
-                              onPressed: () async {
-                                try {
-                                  await ref.read(profileNotifierProvider.notifier).saveInterpretation(widget.profileId!, text);
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Interpretation Saved')));
-                                  }
-                                } catch (e) {
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error saving: $e')));
-                                  }
-                                }
-                              },
-                              icon: const Icon(Icons.save),
-                              label: const Text("Save Interpretation to Profile"),
-                            )
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.secondary),
-                  onPressed: () => Navigator.pop(context),
-                  child: Text('Close', style: TextStyle(color: Theme.of(context).colorScheme.onSecondary, fontWeight: FontWeight.bold)),
-                ),
-              )
-            ],
-          ),
-        );
-      },
-    );
+  String get _birthLabel {
+    final b = widget.birth;
+    String two(int v) => v.toString().padLeft(2, '0');
+    final off = widget.timezone;
+    final sign = off >= 0 ? '+' : '-';
+    final mins = (off.abs() * 60).round();
+    return '${b.year}-${two(b.month)}-${two(b.day)}  ${two(b.hour)}:${two(b.minute)}  (UTC$sign${mins ~/ 60}:${two(mins % 60)})';
   }
 
   void _handleHouseTapped(int houseNum) {
-    final planets = _chartData.housePlanets[houseNum] ?? [];
-    final prompt = 'Analyze House $houseNum of this Vedic birth chart.\n'
-        'Planets present: ${planets.isEmpty ? 'Empty house' : planets.join(', ')}.\n'
-        'Provide a detailed Vedic astrological interpretation.';
-    _showAIModal('House $houseNum Analysis', prompt);
+    final prompt = 'Analyze house $houseNum of this Vedic birth chart in detail.\n\n'
+        '${ChartSummary.describeHouse(_chartData, houseNum)}\n\n'
+        'Full chart for context:\n${ChartSummary.describe(_chartData, name: widget.name)}';
+    showAiSheet(context, ref, title: tr('House $houseNum Analysis', 'भाव $houseNum विश्लेषण'), prompt: prompt, profileId: widget.profileId);
   }
 
+  void _open(Widget screen) => Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
+
   void _handleActionTapped(String featureTitle) {
-    if (featureTitle == 'Planet') {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => GrahaScreen(chartData: _chartData)));
-    } else if (featureTitle == 'Dasha') {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => DashaScreen(chartData: _chartData, birthDate: widget.date)));
-    } else if (featureTitle == 'Daily Panchang') {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => PanchangScreen(chartData: _chartData, lat: widget.lat, lon: widget.lon)));
-    } else if (featureTitle == 'Dosha' || featureTitle == 'Doshas') {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => DoshasScreen(chartData: _chartData)));
-    } else if (featureTitle == 'Yogas') {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => YogasScreen(chartData: _chartData)));
-    } else if (featureTitle == 'Shodashvarga') {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => VargaScreen(chartData: _chartData, profileId: widget.profileId)));
-    } else if (featureTitle == 'Transit') {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => TransitScreen(chartData: _chartData, timezone: widget.timezone, profileId: widget.profileId)));
-    } else if (featureTitle == 'Nakshtra') {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => NakshatraScreen(chartData: _chartData)));
-    } else if (featureTitle == 'KP System') {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => KPSystemScreen(chartData: _chartData, lat: widget.lat, lon: widget.lon)));
-    } else if (featureTitle == 'Lal Kitab') {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => LalKitabScreen(chartData: _chartData)));
-    } else if (featureTitle == 'Predictions') {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => PredictionsScreen(chartData: _chartData, profileId: widget.profileId)));
-    } else if (featureTitle == 'Barshphal') {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => BarshphalScreen(chartData: _chartData, birthYear: widget.date.year, lat: widget.lat, lon: widget.lon)));
-    } else if (featureTitle == 'Remedies') {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => RemediesScreen(chartData: _chartData)));
-    } else if (featureTitle == 'Planet Cons.') {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => PlanetConsScreen(chartData: _chartData)));
-    } else if (featureTitle == 'Interpretation') {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => InterpretationScreen(profileId: widget.profileId)));
-    } else if (featureTitle == 'Ask AI') {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => AiChatScreen(chartData: _chartData, profileId: widget.profileId)));
-    } else {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => GenericDataScreen(
-        chartData: _chartData,
-        featureTitle: featureTitle,
-        birthDate: widget.date,
-        birthTime: widget.time,
-        lat: widget.lat,
-        lon: widget.lon,
-      )));
+    final c = _chartData;
+    final id = widget.profileId;
+    switch (featureTitle) {
+      case 'Synthesis':
+        _open(SynthesisScreen(chartData: c, profileId: id, name: widget.name));
+      case 'Conjunctions':
+        _open(ConjunctionsScreen(chartData: c, profileId: id, name: widget.name));
+      case 'Strength':
+        _open(StrengthScreen(chartData: c));
+      case 'Ashtakavarga':
+        _open(AshtakavargaScreen(chartData: c));
+      case 'Planet':
+        _open(GrahaScreen(chartData: c, profileId: id, name: widget.name));
+      case 'Dasha':
+        _open(DashaScreen(chartData: c, profileId: id, name: widget.name));
+      case 'Panchang':
+        _open(PanchangScreen(chartData: c, lat: widget.lat, lon: widget.lon, timezone: widget.timezone, tzName: widget.tzName));
+      case 'Dosha':
+        _open(DoshasScreen(chartData: c));
+      case 'Yogas':
+        _open(YogasScreen(chartData: c, gender: widget.gender, profileId: id, name: widget.name));
+      case 'Shodashvarga':
+        _open(VargaScreen(chartData: c, profileId: id));
+      case 'Transit':
+        _open(TransitScreen(chartData: c, profileId: id));
+      case 'Nakshatra':
+        _open(NakshatraScreen(chartData: c));
+      case 'KP System':
+        _open(KPSystemScreen(chartData: c));
+      case 'Lal Kitab':
+        _open(LalKitabScreen(chartData: c));
+      case 'Predictions':
+        _open(PredictionsScreen(chartData: c, profileId: id, name: widget.name));
+      case 'Barshphal':
+        _open(BarshphalScreen(chartData: c));
+      case 'Remedies':
+        _open(RemediesScreen(chartData: c));
+      case 'Avasthas':
+        _open(PlanetConsScreen(chartData: c));
+      case 'Interpretation':
+        _open(InterpretationScreen(profileId: id));
+      case 'Ask AI':
+        _open(AiChatScreen(chartData: c, profileId: id, name: widget.name));
     }
   }
+
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final asc = _chartData.ascendantSidereal;
+    final moon = _chartData.planetLongitudes['moon']!;
     return Scaffold(
       appBar: AppBar(
-        title: Text('${widget.name}\'s Horoscope'),
+        title: Text(tr('Horoscope', 'कुंडली')),
         actions: [
-          IconButton(icon: const Icon(Icons.picture_as_pdf), onPressed: () async {
-            final pdfService = PdfService();
-            await pdfService.generateAndShareAstrologicalReport(_chartData, widget.name, widget.date);
-          }),
+          IconButton(
+            icon: const Icon(Icons.picture_as_pdf),
+            tooltip: tr('Export PDF', 'PDF निर्यात'),
+            onPressed: () => PdfService().generateAndShareAstrologicalReport(
+              _chartData,
+              widget.name,
+              birthLabel: _birthLabel,
+              place: widget.place,
+            ),
+          ),
         ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Text(widget.name, style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 24, fontWeight: FontWeight.bold)),
-            Text(
-              '${widget.date.toIso8601String().split('T')[0]} • ${widget.time.format(context)}',
-              style: TextStyle(color: Theme.of(context).colorScheme.secondary.withOpacity(0.8), fontSize: 14),
-            ),
+            Text(widget.name, style: TextStyle(color: scheme.onSurface, fontSize: 24, fontWeight: FontWeight.bold)),
+            Text(_birthLabel, style: TextStyle(color: scheme.secondary.withValues(alpha: 0.8), fontSize: 14)),
+            if (widget.place != null)
+              Text(widget.place!, style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12), textAlign: TextAlign.center),
             const SizedBox(height: 8),
             Text(
-              'Tap on any house for AI Interpretation',
-              style: TextStyle(color: Theme.of(context).colorScheme.secondary.withOpacity(0.8), fontSize: 14),
+              '${tr('Lagna', 'लग्न')} ${L10n.sign(_chartData.lagnaRashi)} ${VedicMath.formatDegree(asc)}  •  '
+              '${tr('Moon', 'चन्द्र')} ${L10n.sign(VedicMath.rashiIndex(moon))}, ${L10n.nakshatra(VedicMath.nakshatraIndex(moon))}',
+              style: TextStyle(color: scheme.onSurface, fontSize: 13),
+              textAlign: TextAlign.center,
             ),
+            const SizedBox(height: 4),
+            Text(tr('Tap on any house for AI interpretation', 'AI विश्लेषण के लिए किसी भी भाव पर टैप करें'),
+                style: TextStyle(color: scheme.secondary.withValues(alpha: 0.8), fontSize: 12)),
             KundliChart(
-              housePlanets: _chartData.housePlanets,
-              ascendantSign: (_chartData.ascendantSidereal / 30).floor() + 1,
+              housePlanets: chartLabels(_chartData),
+              ascendantSign: _chartData.lagnaRashi + 1,
+              showLegend: true,
               onHouseTapped: _handleHouseTapped,
             ),
-            const SizedBox(height: 24),
-            
-            // Action Buttons Grid
+            const SizedBox(height: 16),
             Wrap(
               spacing: 12,
               runSpacing: 12,
               alignment: WrapAlignment.center,
-              children: _actionButtons.map((btn) => _buildActionButton(btn['title'] as String, btn['icon'] as IconData)).toList(),
+              children: _actionButtons.map((btn) => _buildActionButton(btn.$1, btn.$2)).toList(),
             ),
             const SizedBox(height: 40),
           ],
@@ -279,20 +239,15 @@ class _KundliResultScreenState extends ConsumerState<KundliResultScreen> {
   }
 
   Widget _buildActionButton(String title, IconData icon) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       width: 100,
       height: 80,
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Theme.of(context).colorScheme.secondary.withOpacity(0.2)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: Border.all(color: scheme.secondary.withValues(alpha: 0.2)),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 4, offset: const Offset(0, 2))],
       ),
       child: Material(
         color: Colors.transparent,
@@ -302,13 +257,11 @@ class _KundliResultScreenState extends ConsumerState<KundliResultScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, color: Theme.of(context).colorScheme.secondary, size: 28),
+              Icon(icon, color: scheme.secondary, size: 28),
               const SizedBox(height: 8),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 11, fontWeight: FontWeight.bold),
-              ),
+              Text(L10n.hi ? (KundliResultScreen.hindiTitles[title] ?? title) : title,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: scheme.onSurface, fontSize: 11, fontWeight: FontWeight.bold)),
             ],
           ),
         ),

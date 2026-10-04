@@ -1,0 +1,63 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
+import '../core/l10n.dart';
+
+/// The bundled "Comprehensive Guide to Yogas" (assets/docs/vedic_yogas_guide.md).
+class YogaGuideView extends StatelessWidget {
+  const YogaGuideView({super.key});
+
+  static const String asset = 'assets/docs/vedic_yogas_guide.md';
+
+  @override
+  Widget build(BuildContext context) => const MarkdownDocView(asset: asset);
+}
+
+/// Renders a bundled Markdown document.
+class MarkdownDocView extends StatefulWidget {
+  final String asset;
+  const MarkdownDocView({super.key, required this.asset});
+
+  @override
+  State<MarkdownDocView> createState() => _MarkdownDocViewState();
+}
+
+class _MarkdownDocViewState extends State<MarkdownDocView> {
+  late final Future<String> _text = rootBundle.loadString(widget.asset, cache: false);
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return FutureBuilder<String>(
+      future: _text,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) return Center(child: Text('${tr('Could not open the document', 'दस्तावेज़ नहीं खुल सका')}: ${snapshot.error}'));
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+        return Markdown(
+          data: snapshot.data!,
+          selectable: true,
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 48),
+          styleSheet: MarkdownStyleSheet.fromTheme(theme).copyWith(
+            p: TextStyle(color: theme.colorScheme.onSurface, fontSize: 15, height: 1.5),
+            h1: TextStyle(color: theme.colorScheme.primary, fontSize: 22, fontWeight: FontWeight.bold),
+            h2: TextStyle(color: theme.colorScheme.secondary, fontSize: 19, fontWeight: FontWeight.bold),
+            h3: TextStyle(color: theme.colorScheme.onSurface, fontSize: 17, fontWeight: FontWeight.bold),
+            tableBody: TextStyle(color: theme.colorScheme.onSurface, fontSize: 13),
+            tableHead: TextStyle(color: theme.colorScheme.onSurface, fontSize: 13, fontWeight: FontWeight.bold),
+            tableColumnWidth: const FlexColumnWidth(),
+            tableCellsPadding: const EdgeInsets.all(6),
+            blockquoteDecoration: BoxDecoration(
+              color: theme.colorScheme.primaryContainer.withValues(alpha: 0.4),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            codeblockDecoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            code: TextStyle(fontFamily: 'monospace', fontSize: 11, color: theme.colorScheme.onSurface),
+          ),
+        );
+      },
+    );
+  }
+}

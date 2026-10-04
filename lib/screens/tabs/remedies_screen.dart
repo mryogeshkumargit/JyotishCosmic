@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../core/ephemeris.dart';
 import '../../core/remedies_math.dart';
+import '../../core/l10n.dart';
+import '../../widgets/analysis_widgets.dart';
 
 class RemediesScreen extends StatefulWidget {
   final ChartData chartData;
@@ -12,13 +14,18 @@ class RemediesScreen extends StatefulWidget {
 }
 
 class _RemediesScreenState extends State<RemediesScreen> {
-  late List<RemedyResult> _remedies;
+  String? _lang;
+  late List<RemedyResult> _remediesCache;
 
-  @override
-  void initState() {
-    super.initState();
-    _remedies = RemediesMath.compute(widget.chartData);
+  /// Recomputed when the app language changes (the engine writes bilingual text).
+  List<RemedyResult> get _remedies {
+    if (_lang != L10n.lang) {
+      _lang = L10n.lang;
+      _remediesCache = RemediesMath.compute(widget.chartData);
+    }
+    return _remediesCache;
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -27,28 +34,32 @@ class _RemediesScreenState extends State<RemediesScreen> {
     final doshas = _remedies.where((r) => r.type == 'dosha').toList();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Astrological Remedies')),
+      appBar: AppBar(title: Text(tr('Remedies', 'उपाय'))),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const Text('Recommended Gemstones (Benefics)', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.blue)),
+          SimpleMeaningCard([
+            tr('Remedies are traditional practices meant to strengthen helpful planets and calm difficult ones. Gemstones are suggested only for the lords of your 1st, 5th and 9th houses (your most helpful planets); mantras and charity are suggested for the planets that rule difficult houses. Always consult an experienced astrologer before wearing a gemstone.',
+                'उपाय पारंपरिक साधन हैं जो सहायक ग्रहों को बल देने और कठिन ग्रहों को शांत करने के लिए हैं। रत्न केवल आपके 1, 5 और 9वें भाव के स्वामियों (सबसे सहायक ग्रह) के लिए सुझाए गए हैं; मंत्र और दान कठिन भावों के स्वामियों के लिए। रत्न पहनने से पहले किसी अनुभवी ज्योतिषी से सलाह अवश्य लें।'),
+          ]),
+          Text(tr('Recommended Gemstones (Benefics)', 'अनुशंसित रत्न (शुभ ग्रह)'), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.blue)),
           const SizedBox(height: 8),
-          const Text('These gemstones strengthen your functional benefic planets (Lords of 1st, 5th, and 9th houses).', style: TextStyle(color: Colors.grey)),
+          Text(tr('These gemstones strengthen your functional benefic planets (Lords of 1st, 5th, and 9th houses).', 'ये रत्न आपके कार्यात्मक शुभ ग्रहों (1, 5 और 9वें भाव के स्वामी) को बल देते हैं।'), style: const TextStyle(color: Colors.grey)),
           const SizedBox(height: 16),
           ...gemstones.map((g) => _buildRemedyCard(g, Icons.diamond, Colors.blueAccent)),
           
           const SizedBox(height: 24),
-          const Text('Pacification (Mantras & Charity)', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.orange)),
+          Text(tr('Pacification (Mantras & Charity)', 'शांति (मंत्र और दान)'), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.orange)),
           const SizedBox(height: 8),
-          const Text('These practices pacify functional malefic planets to reduce their negative impacts.', style: TextStyle(color: Colors.grey)),
+          Text(tr('These practices pacify functional malefic planets to reduce their negative impacts.', 'ये साधन कार्यात्मक पाप ग्रहों को शांत करके उनके नकारात्मक प्रभाव कम करते हैं।'), style: const TextStyle(color: Colors.grey)),
           const SizedBox(height: 16),
           ...charities.map((c) => _buildRemedyCard(c, Icons.clean_hands, Colors.orangeAccent)),
 
           if (doshas.isNotEmpty) ...[
             const SizedBox(height: 24),
-            const Text('Dosha Specific Remedies', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.redAccent)),
+            Text(tr('Dosha Specific Remedies', 'दोष के विशेष उपाय'), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.redAccent)),
             const SizedBox(height: 8),
-            const Text('Specific remedies prescribed for the Doshas present in your chart.', style: TextStyle(color: Colors.grey)),
+            Text(tr('Specific remedies prescribed for the Doshas present in your chart.', 'आपकी कुंडली में उपस्थित दोषों के लिए विशेष उपाय।'), style: const TextStyle(color: Colors.grey)),
             const SizedBox(height: 16),
             ...doshas.map((d) => _buildRemedyCard(d, Icons.warning_amber_rounded, Colors.redAccent)),
           ]
@@ -69,7 +80,7 @@ class _RemediesScreenState extends State<RemediesScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, color: color, size: 28),

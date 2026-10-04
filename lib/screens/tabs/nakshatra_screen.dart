@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../core/ephemeris.dart';
 import '../../core/vedic_math.dart';
+import '../../core/l10n.dart';
+import '../../core/nakshatra_hi.dart';
 
 class NakshatraScreen extends StatelessWidget {
   final ChartData chartData;
@@ -16,7 +19,7 @@ class NakshatraScreen extends StatelessWidget {
     Planet lordPlanet = VedicMath.planets[moonNak.lord]!;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Nakshatra Details')),
+      appBar: AppBar(title: Text(tr('Nakshatra', 'नक्षत्र'))),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -28,32 +31,32 @@ class NakshatraScreen extends StatelessWidget {
                 padding: const EdgeInsets.all(24),
                 child: Column(
                   children: [
-                    Text('Your Birth Nakshatra', style: TextStyle(color: Theme.of(context).colorScheme.secondary, fontSize: 14)),
+                    Text(tr('Your Birth Nakshatra', 'आपका जन्म नक्षत्र'), style: TextStyle(color: Theme.of(context).colorScheme.secondary, fontSize: 14)),
                     const SizedBox(height: 8),
-                    Text(moonNak.name, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, fontFamily: 'Cinzel')),
-                    Text(moonNak.hindi, style: const TextStyle(fontSize: 24, color: Colors.amber)),
+                    Text(L10n.hi ? moonNak.hindi : moonNak.name, textAlign: TextAlign.center, style: GoogleFonts.cinzel(fontSize: 32, fontWeight: FontWeight.bold).copyWith(fontFamilyFallback: const ['NotoSansDevanagari'])),
+                    Text(L10n.hi ? moonNak.name : moonNak.hindi, style: const TextStyle(fontSize: 24, color: Colors.amber)),
                     const SizedBox(height: 16),
-                    Text('Pada $moonPada', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    Text('${tr('Pada', 'पद')} $moonPada', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 24),
-                    _buildDetailRow('Lord / स्वामी', '${lordPlanet.name} (${lordPlanet.hindi})'),
-                    _buildDetailRow('Deity / देवता', moonNak.deity),
-                    _buildDetailRow('Symbol / प्रतीक', moonNak.symbol),
-                    _buildDetailRow('Gana / गण', moonNak.gana),
-                    _buildDetailRow('Nadi / नाड़ी', moonNak.nadi),
-                    _buildDetailRow('Lucky Nos / शुभ अंक', moonNak.lucky),
+                    _buildDetailRow(tr('Lord', 'स्वामी'), L10n.hi ? lordPlanet.hindi : '${lordPlanet.name} (${lordPlanet.hindi})'),
+                    _buildDetailRow(tr('Deity', 'देवता'), NakshatraHi.deity(moonNakIdx)),
+                    _buildDetailRow(tr('Symbol', 'प्रतीक'), NakshatraHi.symbol(moonNakIdx)),
+                    _buildDetailRow(tr('Gana', 'गण'), NakshatraHi.gana(moonNak.gana)),
+                    _buildDetailRow(tr('Nadi', 'नाड़ी'), NakshatraHi.nadi(moonNak.nadi)),
+                    _buildDetailRow(tr('Lucky numbers', 'शुभ अंक'), moonNak.lucky),
                     const SizedBox(height: 16),
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.5),
+                        color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.5),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Detailed Interpretation', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          Text(tr('Nature of this nakshatra', 'इस नक्षत्र का स्वभाव'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                           const SizedBox(height: 8),
-                          Text(moonNak.description, style: const TextStyle(fontSize: 14, height: 1.4)),
+                          Text(NakshatraHi.description(moonNakIdx), style: const TextStyle(fontSize: 14, height: 1.4)),
                         ],
                       ),
                     ),
@@ -62,7 +65,7 @@ class NakshatraScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 24),
-            Text('The 27 Nakshatras', style: Theme.of(context).textTheme.titleLarge),
+            Text(tr('The 27 Nakshatras', '27 नक्षत्र'), style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 16),
             GridView.builder(
               shrinkWrap: true,
@@ -79,18 +82,22 @@ class NakshatraScreen extends StatelessWidget {
                 bool isCurrent = index == moonNakIdx;
                 return Container(
                   decoration: BoxDecoration(
-                    color: isCurrent ? Colors.amber.withOpacity(0.2) : Theme.of(context).cardColor,
-                    border: Border.all(color: isCurrent ? Colors.amber : Colors.grey.withOpacity(0.2)),
+                    color: isCurrent ? Colors.amber.withValues(alpha: 0.2) : Theme.of(context).cardColor,
+                    border: Border.all(color: isCurrent ? Colors.amber : Colors.grey.withValues(alpha: 0.2)),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Column(
+                  padding: const EdgeInsets.all(4),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text('${index + 1}', style: TextStyle(color: isCurrent ? Colors.amber : Colors.grey, fontSize: 12)),
-                      Text(nak.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12), textAlign: TextAlign.center),
-                      Text(nak.hindi, style: TextStyle(color: Theme.of(context).colorScheme.secondary, fontSize: 12)),
-                      Text(nak.lord, style: const TextStyle(color: Colors.grey, fontSize: 10)),
+                      Text(L10n.hi ? nak.hindi : nak.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12), textAlign: TextAlign.center),
+                      Text(L10n.hi ? nak.name : nak.hindi, style: TextStyle(color: Theme.of(context).colorScheme.secondary, fontSize: 12)),
+                      Text(L10n.planet(nak.lord), style: const TextStyle(color: Colors.grey, fontSize: 10)),
                     ],
+                  ),
                   ),
                 );
               },
@@ -105,10 +112,11 @@ class NakshatraScreen extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(color: Colors.grey)),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+          Expanded(child: Text(label, style: const TextStyle(color: Colors.grey))),
+          const SizedBox(width: 12),
+          Expanded(child: Text(value, textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.bold))),
         ],
       ),
     );

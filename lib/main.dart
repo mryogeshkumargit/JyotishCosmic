@@ -1,24 +1,85 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:sweph/sweph.dart';
+import 'core/ephemeris.dart';
+import 'core/l10n.dart';
+import 'core/vedic_math.dart';
+import 'services/location_service.dart';
 import 'theme/app_theme.dart';
 import 'screens/dashboard_screen.dart';
 import 'providers/settings_provider.dart';
 
-void main() {
+class _RootBundleAssetLoader implements AssetLoader {
+  @override
+  Future<Uint8List> load(String assetPath) async {
+    return (await rootBundle.load(assetPath)).buffer.asUint8List();
+  }
+}
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Fonts are bundled under assets/google_fonts; never download them.
+  GoogleFonts.config.allowRuntimeFetching = false;
+
+  Object? startupError;
+  try {
+    final supportDir = await getApplicationSupportDirectory();
+    await Ephemeris.init(
+      assetLoader: _RootBundleAssetLoader(),
+      epheFilesPath: '${supportDir.path}/ephe_files',
+    );
+    LocationService.ensureTimeZones();
+  } catch (e) {
+    startupError = e;
+  }
+
   runApp(
-    const ProviderScope(
-      child: MobileJyotishApp(),
+    ProviderScope(
+      child: startupError == null ? const MobileJyotishApp() : _StartupErrorApp(startupError),
     ),
   );
 }
 
-class MobileJyotishApp extends ConsumerWidget {
+class MobileJyotishApp extends ConsumerStatefulWidget {
   const MobileJyotishApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MobileJyotishApp> createState() => _MobileJyotishAppState();
+}
+
+class _MobileJyotishAppState extends ConsumerState<MobileJyotishApp> {
+  String _lang = L10n.lang;
+
+  /// Rebuilds every widget (including routes below the current one) so text
+  /// produced with [tr] switches language immediately.
+  void _rebuildAll() {
+    void mark(Element e) {
+      e.markNeedsBuild();
+      e.visitChildren(mark);
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) (context as Element).visitChildren(mark);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
-    
+    // Apply the calculation conventions chosen in Settings to the engines.
+    Ephemeris.configure(ayanamsa: settings.calc.ayanamsa, trueNode: settings.calc.trueNode);
+    DashaCalculations.yearDays = settings.calc.dashaYearDays;
+    L10n.lang = settings.appLanguage;
+    if (_lang != settings.appLanguage) {
+      _lang = settings.appLanguage;
+      _rebuildAll();
+    }
+
     ThemeData activeTheme;
     if (settings.themeMode == 'Dark') {
       activeTheme = AppTheme.darkTheme;
@@ -31,9 +92,29 @@ class MobileJyotishApp extends ConsumerWidget {
     return MaterialApp(
       title: 'Jyotish Cosmic',
       theme: activeTheme,
+      locale: Locale(settings.appLanguage),
+      supportedLocales: const [Locale('en'), Locale('hi')],
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
       home: const DashboardScreen(),
     );
   }
 }
 
+class _StartupErrorApp extends StatelessWidget {
+  final Object error;
+  const _StartupErrorApp(this.error);
 
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text('${tr('Could not start the Swiss Ephemeris engine', 'स्विस एफ़ेमेरिस इंजन शुरू नहीं हो सका')}:\n\n$error', textAlign: TextAlign.center),
+          ),
+        ),
+      ),
+    );
+  }
+}

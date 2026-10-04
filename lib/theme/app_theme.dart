@@ -24,7 +24,7 @@ class AppTheme {
       onSurface: const Color(0xFFE5E7EB), // Very legible off-white
       surfaceContainerHighest: const Color(0xFF1A1C23), // Cards
       onSurfaceVariant: const Color(0xFF9CA3AF), // Subtitles
-      outline: const Color(0xFFD4AF37).withOpacity(0.3),
+      outline: const Color(0xFFD4AF37).withValues(alpha: 0.3),
     );
 
     return _buildTheme(colorScheme);
@@ -64,6 +64,9 @@ class AppTheme {
     return _buildTheme(colorScheme);
   }
 
+  /// Bundled Devanagari font used for Hindi text (Inter and Cinzel have no Devanagari).
+  static const List<String> devanagariFallback = ['NotoSansDevanagari'];
+
   static ThemeData _buildTheme(ColorScheme colorScheme) {
     return ThemeData(
       useMaterial3: true,
@@ -80,7 +83,7 @@ class AppTheme {
         titleMedium: GoogleFonts.inter(color: colorScheme.onSurface, fontWeight: FontWeight.w600, fontSize: 16),
         bodyLarge: GoogleFonts.inter(color: colorScheme.onSurface, fontSize: 16),
         bodyMedium: GoogleFonts.inter(color: colorScheme.onSurfaceVariant, fontSize: 14),
-      ),
+      ).apply(fontFamilyFallback: devanagariFallback),
 
       // AppBar
       appBarTheme: AppBarTheme(
@@ -91,9 +94,9 @@ class AppTheme {
         iconTheme: IconThemeData(color: colorScheme.primary),
         titleTextStyle: GoogleFonts.cinzel(
           color: colorScheme.primary,
-          fontSize: 24,
+          fontSize: 20,
           fontWeight: FontWeight.bold,
-        ),
+        ).copyWith(fontFamilyFallback: devanagariFallback),
       ),
 
       // Buttons
@@ -104,14 +107,14 @@ class AppTheme {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           elevation: 6,
-          shadowColor: colorScheme.primary.withOpacity(0.4),
-          textStyle: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16),
+          shadowColor: colorScheme.primary.withValues(alpha: 0.4),
+          textStyle: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16).copyWith(fontFamilyFallback: devanagariFallback),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: colorScheme.primary,
-          textStyle: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16),
+          textStyle: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16).copyWith(fontFamilyFallback: devanagariFallback),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -120,7 +123,7 @@ class AppTheme {
           side: BorderSide(color: colorScheme.primary, width: 1.5),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          textStyle: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16),
+          textStyle: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16).copyWith(fontFamilyFallback: devanagariFallback),
         ),
       ),
 
@@ -128,7 +131,7 @@ class AppTheme {
       cardTheme: CardThemeData(
         color: colorScheme.surfaceContainerHighest,
         elevation: 8,
-        shadowColor: colorScheme.primary.withOpacity(0.15),
+        shadowColor: colorScheme.primary.withValues(alpha: 0.15),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
           side: BorderSide(
@@ -143,7 +146,7 @@ class AppTheme {
         filled: true,
         fillColor: colorScheme.surfaceContainerHighest,
         labelStyle: GoogleFonts.inter(color: colorScheme.onSurfaceVariant),
-        hintStyle: GoogleFonts.inter(color: colorScheme.onSurfaceVariant.withOpacity(0.5)),
+        hintStyle: GoogleFonts.inter(color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide(color: colorScheme.outline),
