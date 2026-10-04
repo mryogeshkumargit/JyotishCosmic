@@ -1,5 +1,7 @@
 import 'calc_config.dart';
 import 'ephemeris.dart';
+import 'l10n.dart';
+import 'plain/meanings.dart';
 import 'precision_math.dart';
 import 'vedic_math.dart';
 import 'yogas_math.dart';
@@ -34,21 +36,25 @@ class ConjunctionRecord {
 
   String get functionalLordshipText => planets
       .map((p) => '${ConjunctionDb.planetName(p)}: ${functionalLordship[p]!.join(',')} '
-          '(${functionalLordship[p]!.map((h) => ConjunctionDb.houseClass[h]).join('; ')})')
+          '(${functionalLordship[p]!.map((h) => L10n.hi ? ConjunctionDb.houseClassHi[h] : ConjunctionDb.houseClass[h]).join('; ')})')
       .join(' | ');
 
   String get pairwiseText => pairs.map((p) => '${ConjunctionDb.planetName(p.$1)}-${ConjunctionDb.planetName(p.$2)}').join('; ');
 
-  String get coreThemes => planets.map((p) => ConjunctionDb.planetThemes[p]!).join('; ');
+  String get coreThemes => planets.map((p) => (L10n.hi ? ConjunctionDb.planetThemesHi : ConjunctionDb.planetThemes)[p]!).join('; ');
 
-  String get bhavaInteraction => 'The cluster concentrates its combined planetary significations into the ${ConjunctionDb.bhavaNames[bhava - 1]} domain.';
+  String get bhavaInteraction => tr('The cluster concentrates its combined planetary significations into the ${ConjunctionDb.bhavaNames[bhava - 1]} domain.',
+      'यह युति अपने ग्रहों के संयुक्त फलों को ${ConjunctionDb.bhavaNamesHi[bhava - 1]} भाव के क्षेत्र में केंद्रित करती है।');
 
-  String get rashiInteraction => 'The ${VedicMath.rashis[rashi].name} environment modifies expression through '
-      '${element.toLowerCase()} element, ${modality.toLowerCase()} modality, and ${ConjunctionDb.planetName(dispositor)} as dispositor.';
+  String get rashiInteraction => tr(
+      'The ${VedicMath.rashis[rashi].name} environment modifies expression through '
+          '${element.toLowerCase()} element, ${modality.toLowerCase()} modality, and ${ConjunctionDb.planetName(dispositor)} as dispositor.',
+      '${L10n.sign(rashi)} राशि का वातावरण ${L10n.element(element)} तत्व, ${ConjunctionDb.modalityLabel(rashi)} स्वभाव और राशि स्वामी ${L10n.planet(dispositor)} के माध्यम से फल को बदलता है।');
 
-  static const String interpretiveRule =
+  static String get interpretiveRule => tr(
       'Do not read this record in isolation. First check any exact classical multi-planet rule for the cluster; then integrate '
-      'the pairwise rules; then apply Lagna lordship, dignity, dispositor, aspects, strength, Vargas and timing.';
+          'the pairwise rules; then apply Lagna lordship, dignity, dispositor, aspects, strength, Vargas and timing.',
+      'इस रिकॉर्ड को अलग से न पढ़ें। पहले इस युति का कोई सटीक शास्त्रीय नियम देखें; फिर जोड़ों के नियम मिलाएँ; फिर लग्न स्वामित्व, गरिमा, राशि स्वामी, दृष्टि, बल, वर्ग और समय लागू करें।');
 
   /// Volume 2 pair texts for this placement (pair x Bhava, pair x Rashi, pair x Lagna).
   List<({String id, String pair, String bhava, String rashi, String lagna})> pairTexts() => [
@@ -122,6 +128,67 @@ class ConjunctionDb {
     'venus-saturn': 'pleasure + discipline/craft',
   };
 
+  static const Map<String, String> planetThemesHi = {
+    'sun': 'पहचान, अधिकार, जीवनशक्ति, पद',
+    'moon': 'मन, भावना, पोषण, अनुकूलन',
+    'mars': 'कर्म, साहस, पहल, संघर्ष',
+    'mercury': 'बुद्धि, वाणी, विश्लेषण, व्यापार',
+    'jupiter': 'ज्ञान, विद्या, विस्तार, परामर्श',
+    'venus': 'संबंध, सुख, कला, मूल्य',
+    'saturn': 'अनुशासन, कर्तव्य, विलंब, संरचना, सहनशीलता',
+  };
+
+  static const Map<String, String> pairThemesHi = {
+    'sun-moon': 'इच्छाशक्ति/पहचान + मन/भावना',
+    'sun-mars': 'अधिकार + कर्म/साहस',
+    'sun-mercury': 'अधिकार + बुद्धि/संवाद',
+    'sun-jupiter': 'अधिकार + ज्ञान/विद्या',
+    'sun-venus': 'अधिकार + सौंदर्य/संबंध',
+    'sun-saturn': 'अधिकार + कर्तव्य/संरचना',
+    'moon-mars': 'भावना + कर्म/उद्यम',
+    'moon-mercury': 'मन + बुद्धि/संवाद',
+    'moon-jupiter': 'मन + ज्ञान/पोषण',
+    'moon-venus': 'मन + सुख/सौंदर्य',
+    'moon-saturn': 'मन + संयम/कर्तव्य',
+    'mars-mercury': 'कर्म + बुद्धि/रणनीति',
+    'mars-jupiter': 'कर्म + ज्ञान/नेतृत्व',
+    'mars-venus': 'कर्म + इच्छा/रचनात्मकता',
+    'mars-saturn': 'शक्ति + संयम/सहनशीलता',
+    'mercury-jupiter': 'बुद्धि + ज्ञान/संश्लेषण',
+    'mercury-venus': 'बुद्धि + सौंदर्य/व्यापार',
+    'mercury-saturn': 'बुद्धि + संरचना/प्रणाली',
+    'jupiter-venus': 'ज्ञान + सुख/मूल्य',
+    'jupiter-saturn': 'विस्तार + संरचना',
+    'venus-saturn': 'सुख + अनुशासन/कारीगरी',
+  };
+
+  static const List<String> bhavaNamesHi = ['तनु', 'धन', 'सहज', 'सुख', 'पुत्र', 'अरि', 'युवती', 'रंध्र', 'धर्म', 'कर्म', 'लाभ', 'व्यय'];
+
+  static const List<String> bhavaDomainsHi = [
+    'पहचान, शरीर, स्वभाव, आत्म-दिशा',
+    'वाणी, परिवार, संचित धन, भोजन और मूल्य',
+    'साहस, कौशल, संवाद, पहल और छोटे भाई-बहन',
+    'घर, माता, संपत्ति, वाहन, शिक्षा और आंतरिक सुरक्षा',
+    'बुद्धि, रचनात्मकता, संतान, विद्या और सट्टा/निवेश',
+    'सेवा, प्रतियोगिता, कर्ज़, शत्रु, दिनचर्या और स्वास्थ्य',
+    'विवाह, साझेदारी, अनुबंध, ग्राहक और लोक व्यवहार',
+    'परिवर्तन, आयु, विरासत, संयुक्त धन और शोध',
+    'भाग्य, पिता/गुरु, उच्च शिक्षा, नैतिकता और तीर्थ',
+    'व्यवसाय, अधिकार, प्रतिष्ठा और दिखने वाले कर्म',
+    'लाभ, संपर्क, आय के स्रोत, बड़े भाई-बहन और महत्वाकांक्षाएँ',
+    'खर्च, विदेश, एकांत, नींद, मुक्ति और निजता',
+  ];
+
+  static const Map<int, String> houseClassHi = {
+    1: 'केन्द्र/त्रिकोण/लग्न', 2: 'मारक', 3: 'उपचय', 4: 'केन्द्र', 5: 'त्रिकोण', 6: 'उपचय/दुःस्थान',
+    7: 'केन्द्र/मारक', 8: 'दुःस्थान', 9: 'त्रिकोण', 10: 'केन्द्र/उपचय', 11: 'उपचय', 12: 'दुःस्थान',
+  };
+
+  /// House domain in the app language (Volume 3 wording in English).
+  static String bhavaDomain(int bhava) => L10n.hi ? bhavaDomainsHi[bhava - 1] : bhavaDomains[bhava - 1];
+  static String bhavaName(int bhava) => L10n.hi ? bhavaNamesHi[bhava - 1] : bhavaNames[bhava - 1];
+  static String modalityLabel(int rashi) => L10n.hi ? const ['चर', 'स्थिर', 'द्विस्वभाव'][rashi % 3] : modality(rashi);
+
   static const List<String> bhavaNames = [
     'Tanu', 'Dhana', 'Sahaja', 'Sukha', 'Putra', 'Ari', 'Yuvati', 'Randhra', 'Dharma', 'Karma', 'Labha', 'Vyaya',
   ];
@@ -166,7 +233,7 @@ class ConjunctionDb {
   static const List<String> _rashiAbbr = ['ARI', 'TAU', 'GEM', 'CAN', 'LEO', 'VIR', 'LIB', 'SCO', 'SAG', 'CAP', 'AQU', 'PIS'];
   static const Map<int, String> _prefix = {2: 'P', 3: 'T', 4: 'Q', 5: 'F', 6: 'S', 7: 'H'};
 
-  static String planetName(String p) => VedicMath.planets[p]?.name ?? VedicMath.capitalize(p);
+  static String planetName(String p) => VedicMath.planets[p] == null ? VedicMath.capitalize(p) : L10n.planet(p);
   static String element(int rashi) => VedicMath.rashis[rashi].element;
   static String modality(int rashi) => const ['Movable', 'Fixed', 'Dual'][rashi % 3];
 
@@ -182,7 +249,7 @@ class ConjunctionDb {
 
   static String pairTheme(String a, String b) {
     final c = canonical([a, b]);
-    return pairThemes['${c[0]}-${c[1]}']!;
+    return (L10n.hi ? pairThemesHi : pairThemes)['${c[0]}-${c[1]}']!;
   }
 
   static String pairId(String a, String b) => clusterIdOf([a, b]);
@@ -193,20 +260,24 @@ class ConjunctionDb {
       ];
 
   /// Volume 2 §5: pair x Bhava interpretation.
-  static String pairBhavaText(String a, String b, int bhava) =>
-      '${pairTheme(a, b)} expressed through ${bhavaDomainsV2[bhava - 1]}. Judge the house lord, Karaka, sign and dispositor before final synthesis.';
+  static String pairBhavaText(String a, String b, int bhava) => tr(
+      '${pairTheme(a, b)} expressed through ${bhavaDomainsV2[bhava - 1]}. Judge the house lord, Karaka, sign and dispositor before final synthesis.',
+      '${pairTheme(a, b)}, ${bhavaDomainsHi[bhava - 1]} के माध्यम से व्यक्त। अंतिम निष्कर्ष से पहले भाव स्वामी, कारक, राशि और राशि स्वामी देखें।');
 
   /// Volume 2 §7: pair x Rashi interpretation.
-  static String pairRashiText(String a, String b, int rashi) =>
+  static String pairRashiText(String a, String b, int rashi) => tr(
       '${pairTheme(a, b)} operating through ${element(rashi).toLowerCase()} ${modality(rashi).toLowerCase()} '
-      '${VedicMath.rashis[rashi].name} symbolism; ${planetName(VedicMath.rashis[rashi].lord)} is the dispositor.';
+          '${VedicMath.rashis[rashi].name} symbolism; ${planetName(VedicMath.rashis[rashi].lord)} is the dispositor.',
+      '${pairTheme(a, b)}, ${L10n.element(element(rashi))} तत्व की ${modalityLabel(rashi)} ${L10n.sign(rashi)} राशि के स्वभाव से; राशि स्वामी ${L10n.planet(VedicMath.rashis[rashi].lord)}।');
 
   /// Volume 2 §9: pair x Lagna functional-lordship question.
-  static String pairLagnaText(String a, String b, int lagna) =>
-      '${lordshipSentence(a, b, lagna)} Combine these house significations with the house occupied by the conjunction.';
+  static String pairLagnaText(String a, String b, int lagna) => tr(
+      '${lordshipSentence(a, b, lagna)} Combine these house significations with the house occupied by the conjunction.',
+      '${lordshipSentence(a, b, lagna)} इन भावों के फलों को युति वाले भाव के साथ मिलाकर पढ़ें।');
 
-  static String lordshipSentence(String a, String b, int lagna) =>
-      '${planetName(a)} owns ${housesOwned(a, lagna).join(',')}; ${planetName(b)} owns ${housesOwned(b, lagna).join(',')}.';
+  static String lordshipSentence(String a, String b, int lagna) => tr(
+      '${planetName(a)} owns ${housesOwned(a, lagna).join(',')}; ${planetName(b)} owns ${housesOwned(b, lagna).join(',')}.',
+      '${planetName(a)} भाव ${housesOwned(a, lagna).join(',')} का स्वामी; ${planetName(b)} भाव ${housesOwned(b, lagna).join(',')} का स्वामी।');
 
   static String sourceTier(int size) => switch (size) {
         2 => 'CLASSICAL-DIRECT + SYSTEMATIC-SYNTHESIS',
@@ -215,12 +286,12 @@ class ConjunctionDb {
       };
 
   static String directSource(int size) => switch (size) {
-        2 => 'Phaladeepika 18.1-5; Brihat Jataka 14.1-5',
-        3 => 'Saravali ch. 16 (three-planet conjunctions); pairwise per Phaladeepika 18.5',
-        4 => 'Saravali ch. 17; Jataka Parijata 8.23; pairwise per Phaladeepika 18.5',
-        5 => 'Saravali ch. 18; Jataka Parijata 8.26; pairwise per Phaladeepika 18.5',
-        6 => 'Saravali ch. 19; pairwise per Phaladeepika 18.5',
-        _ => 'No classical verse for the seven-planet cluster; synthesis of the 21 pairs (Phaladeepika 18.5)',
+        2 => tr('Phaladeepika 18.1-5; Brihat Jataka 14.1-5', 'फलदीपिका 18.1-5; बृहत् जातक 14.1-5'),
+        3 => tr('Saravali ch. 16 (three-planet conjunctions); pairwise per Phaladeepika 18.5', 'सारावली अ. 16 (त्रिग्रह युति); जोड़े फलदीपिका 18.5 के अनुसार'),
+        4 => tr('Saravali ch. 17; Jataka Parijata 8.23; pairwise per Phaladeepika 18.5', 'सारावली अ. 17; जातक पारिजात 8.23; जोड़े फलदीपिका 18.5 के अनुसार'),
+        5 => tr('Saravali ch. 18; Jataka Parijata 8.26; pairwise per Phaladeepika 18.5', 'सारावली अ. 18; जातक पारिजात 8.26; जोड़े फलदीपिका 18.5 के अनुसार'),
+        6 => tr('Saravali ch. 19; pairwise per Phaladeepika 18.5', 'सारावली अ. 19; जोड़े फलदीपिका 18.5 के अनुसार'),
+        _ => tr('No classical verse for the seven-planet cluster; synthesis of the 21 pairs (Phaladeepika 18.5)', 'सात ग्रहों की युति के लिए कोई शास्त्रीय श्लोक नहीं; 21 जोड़ों का संश्लेषण (फलदीपिका 18.5)'),
       };
 
   /// The 120 clusters in catalogue order (P01-P21, T01-T35, Q01-Q35, F01-F21, S01-S07, H01).
@@ -298,13 +369,22 @@ class ConjunctionDb {
   };
 
   static String classicalObservation(String a, String b) {
+    if (L10n.hi) return '${Meanings.pair(a, b)}।';
     final c = canonical([a, b]);
     return classicalObservations['${c[0]}-${c[1]}']!;
   }
 
+  static const List<String> signModifiersHi = [
+    'पहल', 'संसाधन और स्थिरता', 'संवाद और विद्या', 'देखभाल और भावना', 'अधिकार और रचनात्मकता', 'विश्लेषण और सेवा',
+    'साझेदारी और बातचीत', 'गहराई और परिवर्तन', 'विद्या और विस्तार', 'संरचना और करियर', 'प्रणालियाँ और समूह', 'कल्पना और संश्लेषण',
+  ];
+
+  static String signModifier(int rashi) => L10n.hi ? signModifiersHi[rashi] : signModifiers[rashi];
+
   /// Deep Research §7: pair x Rashi with the sign's dominant modifier.
-  static String pairSignModifierText(String a, String b, int rashi) =>
-      '${pairTheme(a, b)}; expressed through ${signModifiers[rashi]}. The condition of ${planetName(VedicMath.rashis[rashi].lord)}, the dispositor, becomes decisive.';
+  static String pairSignModifierText(String a, String b, int rashi) => tr(
+      '${pairTheme(a, b)}; expressed through ${signModifiers[rashi]}. The condition of ${planetName(VedicMath.rashis[rashi].lord)}, the dispositor, becomes decisive.',
+      '${pairTheme(a, b)}; ${signModifiersHi[rashi]} के माध्यम से व्यक्त। राशि स्वामी ${planetName(VedicMath.rashis[rashi].lord)} की स्थिति निर्णायक होती है।');
 
   /// Vargas (from [vargas]) in which every planet of [planets] shares one sign (Deep Research §17).
   static List<String> vargaRepetition(ChartData chart, List<String> planets, List<String> vargas) {
@@ -394,7 +474,7 @@ class ChartConjunction {
 
   late final ClusterDiagnostics diagnostics = ClusterDiagnostics.of(this);
 
-  String get signModifier => ConjunctionDb.signModifiers[record.rashi];
+  String get signModifier => ConjunctionDb.signModifier(record.rashi);
 
   /// Phaladeepika ch. 18 pair summaries for every pair in the cluster.
   List<(String, String)> get classicalObservations => [
@@ -405,7 +485,7 @@ class ChartConjunction {
   late final List<String> vargaRepetition = ConjunctionDb.vargaRepetition(chart, record.planets, const ['D9', 'D10']);
   late final List<String> pairRepetitions = [
     for (final (a, b) in record.pairs)
-      for (final v in ConjunctionDb.vargaRepetition(chart, [a, b], const ['D9', 'D10'])) '${ConjunctionDb.planetName(a)}–${ConjunctionDb.planetName(b)} in $v',
+      for (final v in ConjunctionDb.vargaRepetition(chart, [a, b], const ['D9', 'D10'])) '${ConjunctionDb.planetName(a)}–${ConjunctionDb.planetName(b)} ${tr('in', 'में')} $v',
   ];
 
   /// Common-error cautions that apply to this cluster (Deep Research §12, §19).
@@ -413,16 +493,22 @@ class ChartConjunction {
     final out = <String>[];
     final ps = record.planets;
     if (ps.contains('moon') && ps.contains('jupiter')) {
-      out.add('Moon–Jupiter in one sign is not by itself Gaja-Kesari: that yoga is defined by Jupiter in a Kendra from the Moon and needs strength.');
+      out.add(tr('Moon–Jupiter in one sign is not by itself Gaja-Kesari: that yoga is defined by Jupiter in a Kendra from the Moon and needs strength.',
+          'एक राशि में चन्द्र-गुरु अपने आप गजकेसरी नहीं है: वह योग चन्द्र से केन्द्र में गुरु से बनता है और उसे बल चाहिए।'));
     }
     if (ps.contains('sun') && ps.contains('mercury')) {
       final e = edges.firstWhere((e) => {e.a, e.b}.containsAll(['sun', 'mercury']));
-      out.add('Sun–Mercury (${e.separation.toStringAsFixed(1)}° apart${grahas['mercury']!.combust ? ', Mercury combust' : ''}) is not automatically an exceptional Budha-Āditya result; check degree, combustion, dignity, house and dispositor.');
+      out.add(tr('Sun–Mercury (${e.separation.toStringAsFixed(1)}° apart${grahas['mercury']!.combust ? ', Mercury combust' : ''}) is not automatically an exceptional Budha-Āditya result; check degree, combustion, dignity, house and dispositor.',
+          'सूर्य-बुध (${e.separation.toStringAsFixed(1)}° दूर${grahas['mercury']!.combust ? ', बुध अस्त' : ''}) अपने आप असाधारण बुध-आदित्य फल नहीं है; अंश, अस्त, गरिमा, भाव और राशि स्वामी देखें।'));
     }
     if (ps.contains('sun') && ps.any((p) => p != 'sun' && p != 'moon' && grahas[p]!.combust)) {
-      out.add('Same-sign is not the same as close: ${ps.where((p) => p != 'sun' && p != 'moon' && grahas[p]!.combust).map(ConjunctionDb.planetName).join(', ')} is combust and judged with that modifier.');
+      final c = ps.where((p) => p != 'sun' && p != 'moon' && grahas[p]!.combust).map(ConjunctionDb.planetName).join(', ');
+      out.add(tr('Same-sign is not the same as close: $c is combust and judged with that modifier.', 'एक ही राशि होना पास होना नहीं है: $c अस्त है और उसी के अनुसार आंका गया।'));
     }
-    if (ps.length >= 3) out.add('${ps.length} planets give ${ps.length * (ps.length - 1) ~/ 2} pair relationships; read the dominant planet, dispositor and closest pair before the full list.');
+    if (ps.length >= 3) {
+      out.add(tr('${ps.length} planets give ${ps.length * (ps.length - 1) ~/ 2} pair relationships; read the dominant planet, dispositor and closest pair before the full list.',
+          '${ps.length} ग्रहों से ${ps.length * (ps.length - 1) ~/ 2} जोड़े बनते हैं; पूरी सूची से पहले प्रमुख ग्रह, राशि स्वामी और सबसे निकट जोड़ा देखें।'));
+    }
     return out;
   }
 
@@ -452,15 +538,16 @@ class ChartConjunction {
   /// Running periods that activate the cluster.
   List<String> get activeNow {
     final out = <String>[];
-    const levels = ['Mahadasha', 'Antardasha', 'Pratyantardasha'];
-    for (int i = 0; i < runningLords.length; i++) {
+    final levels = L10n.hi ? const ['महादशा', 'अंतर्दशा', 'प्रत्यंतर्दशा'] : const ['Mahadasha', 'Antardasha', 'Pratyantardasha'];
+    for (int i = 0; i < runningLords.length && i < 3; i++) {
       final l = runningLords[i];
-      if (record.planets.contains(l)) out.add('${levels[i]} lord ${ConjunctionDb.planetName(l)} is a member of the cluster');
-      if (l == record.dispositor && !record.planets.contains(l)) out.add('${levels[i]} lord ${ConjunctionDb.planetName(l)} is the dispositor');
-      if (nodes.contains(l)) out.add('${levels[i]} lord ${ConjunctionDb.planetName(l)} is a node joined with the cluster');
+      final n = ConjunctionDb.planetName(l);
+      if (record.planets.contains(l)) out.add(tr('${levels[i]} lord $n is a member of the cluster', '${levels[i]} स्वामी $n युति का सदस्य है'));
+      if (l == record.dispositor && !record.planets.contains(l)) out.add(tr('${levels[i]} lord $n is the dispositor', '${levels[i]} स्वामी $n राशि स्वामी है'));
+      if (nodes.contains(l)) out.add(tr('${levels[i]} lord $n is a node joined with the cluster', '${levels[i]} स्वामी $n युति के साथ छाया ग्रह है'));
       final h = record.bhava;
       if (VedicMath.rashis[(chart.lagnaRashi + h - 1) % 12].lord == l && !record.planets.contains(l) && l != record.dispositor) {
-        out.add('${levels[i]} lord ${ConjunctionDb.planetName(l)} owns the occupied house');
+        out.add(tr('${levels[i]} lord $n owns the occupied house', '${levels[i]} स्वामी $n उस भाव का स्वामी है'));
       }
     }
     return out;
@@ -479,8 +566,10 @@ class ChartConjunction {
         final mdIn = record.planets.contains(md.lord), adIn = record.planets.contains(ad.lord);
         if (!mdIn && !adIn && ad.lord != record.dispositor) continue;
         final reason = mdIn && adIn
-            ? 'Both Mahadasha and Antardasha lords are in the cluster'
-            : (adIn ? 'Antardasha lord in the cluster' : (mdIn ? 'Mahadasha lord in the cluster' : 'Antardasha of the dispositor'));
+            ? tr('Both Mahadasha and Antardasha lords are in the cluster', 'महादशा और अंतर्दशा दोनों के स्वामी युति में हैं')
+            : (adIn
+                ? tr('Antardasha lord in the cluster', 'अंतर्दशा स्वामी युति में')
+                : (mdIn ? tr('Mahadasha lord in the cluster', 'महादशा स्वामी युति में') : tr('Antardasha of the dispositor', 'राशि स्वामी की अंतर्दशा')));
         out.add(DashaActivation('Antardasha', ad.lord, md.lord, ad.startDate, ad.endDate, ad.startJD, reason));
         if (out.length >= limit) return out;
       }
@@ -500,6 +589,12 @@ class ClusterDiagnostics {
   final PairEdge? widestPair;
   final String centralPlanet;
   final String dominantDignity;
+
+  String get dominantDignityLabel => switch (dominantDignity) {
+        'strong' => tr('strong', 'बलवान'),
+        'weak' => tr('weak', 'कमज़ोर'),
+        _ => tr('neutral', 'सम'),
+      };
   final int combustCount;
   final int retrogradeCount;
   final List<String> nodes;
@@ -626,14 +721,17 @@ class NodeAssociation {
     final kendraLords = {lordOf(1), lordOf(4), lordOf(7), lordOf(10)};
     final trikonaLords = {lordOf(1), lordOf(5), lordOf(9)};
     if (YogasMath.isKendra(h) && planets.any(trikonaLords.contains)) {
-      out.add('In a Kendra with a Trikona lord (${ConjunctionDb.planetName(planets.firstWhere(trikonaLords.contains))}): can act as a Raja Yoga giver.');
+      final t = ConjunctionDb.planetName(planets.firstWhere(trikonaLords.contains));
+      out.add(tr('In a Kendra with a Trikona lord ($t): can act as a Raja Yoga giver.', 'केन्द्र में त्रिकोण स्वामी ($t) के साथ: राज योग दे सकता है।'));
     }
     if (YogasMath.isTrikona(h) && planets.any(kendraLords.contains)) {
-      out.add('In a Trikona with a Kendra lord (${ConjunctionDb.planetName(planets.firstWhere(kendraLords.contains))}): can act as a Raja Yoga giver.');
+      final k = ConjunctionDb.planetName(planets.firstWhere(kendraLords.contains));
+      out.add(tr('In a Trikona with a Kendra lord ($k): can act as a Raja Yoga giver.', 'त्रिकोण में केन्द्र स्वामी ($k) के साथ: राज योग दे सकता है।'));
     }
-    if (YogasMath.isDusthana(h)) out.add('In a dusthana (house $h).');
-    out.add('Results follow its dispositor ${ConjunctionDb.planetName(dispositor)} (house ${PrecisionMath.record(chart, dispositor, cfg).house}) '
-        'and nakshatra lord ${ConjunctionDb.planetName(graha.nakshatraLord)}.');
+    if (YogasMath.isDusthana(h)) out.add(tr('In a dusthana (house $h).', 'दुःस्थान में (भाव $h)।'));
+    final dh = PrecisionMath.record(chart, dispositor, cfg).house;
+    out.add(tr('Results follow its dispositor ${ConjunctionDb.planetName(dispositor)} (house $dh) and nakshatra lord ${ConjunctionDb.planetName(graha.nakshatraLord)}.',
+        'फल इसके राशि स्वामी ${ConjunctionDb.planetName(dispositor)} (भाव $dh) और नक्षत्र स्वामी ${ConjunctionDb.planetName(graha.nakshatraLord)} के अनुसार।'));
     return out;
   }
 }

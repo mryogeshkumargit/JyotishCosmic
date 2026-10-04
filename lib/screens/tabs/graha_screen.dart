@@ -5,6 +5,8 @@ import '../../core/ephemeris.dart';
 import '../../core/planetary_dignity.dart';
 import '../../core/vedic_math.dart';
 import '../../widgets/ai_sheet.dart';
+import '../../core/l10n.dart';
+import '../../core/plain/interpret.dart';
 
 class GrahaScreen extends ConsumerWidget {
   final ChartData chartData;
@@ -18,15 +20,17 @@ class GrahaScreen extends ConsumerWidget {
     final List<Map<String, dynamic>> planetDetails = [];
     final rashis = {for (final e in chartData.planetLongitudes.entries) e.key: VedicMath.rashiIndex(e.value)};
 
-    void add(String label, String hindi, double sid, {String dignity = '-', bool retro = false, double? speed}) {
+    void add(String label, String hindi, double sid, {String dignity = '-', bool retro = false, double? speed, String? key}) {
       final r = VedicMath.rashiIndex(sid);
       planetDetails.add({
         'name': label,
         'hindi': hindi,
+        'key': key,
+        'sign': r,
         'degree': VedicMath.formatDegree(sid),
-        'rashi': VedicMath.rashis[r].name,
+        'rashi': L10n.sign(r),
         'house': VedicMath.houseOf(r, chartData.lagnaRashi),
-        'nakshatra': '${VedicMath.nakshatras[VedicMath.nakshatraIndex(sid)].name} (${VedicMath.pada(sid)})',
+        'nakshatra': '${L10n.nakshatra(VedicMath.nakshatraIndex(sid))} (${VedicMath.pada(sid)})',
         'dignity': dignity,
         'retro': retro,
         'speed': speed,
@@ -39,13 +43,14 @@ class GrahaScreen extends ConsumerWidget {
       final p = VedicMath.planets[key];
       if (sid == null || p == null) continue;
       add(p.name, p.hindi, sid,
+          key: key,
           dignity: PlanetaryDignity.getAdvancedDignity(key, VedicMath.rashiIndex(sid), rashis, degree: VedicMath.degInRashi(sid)),
           retro: chartData.isRetrograde(key),
           speed: chartData.planetSpeeds[key]);
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Planets')),
+      appBar: AppBar(title: Text(tr('Planets', 'ग्रह'))),
       body: ListView.builder(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
         itemCount: planetDetails.length,
@@ -67,7 +72,7 @@ class GrahaScreen extends ConsumerWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Flexible(
-                        child: Text('${pd['name']} (${pd['hindi']})${pd['retro'] ? '  ℞' : ''}',
+                        child: Text('${L10n.hi ? pd['hindi'] : '${pd['name']} (${pd['hindi']})'}${pd['retro'] ? '  ℞' : ''}',
                             style: TextStyle(color: scheme.secondary, fontSize: 18, fontWeight: FontWeight.bold)),
                       ),
                       const SizedBox(width: 8),
@@ -79,16 +84,20 @@ class GrahaScreen extends ConsumerWidget {
                     spacing: 16,
                     runSpacing: 4,
                     children: [
-                      Text('House ${pd['house']}', style: TextStyle(color: scheme.onSurface.withValues(alpha: 0.8))),
-                      Text('Nakshatra: ${pd['nakshatra']}', style: TextStyle(color: scheme.onSurface.withValues(alpha: 0.8))),
+                      Text('${tr('House', 'भाव')} ${pd['house']}', style: TextStyle(color: scheme.onSurface.withValues(alpha: 0.8))),
+                      Text('${tr('Nakshatra', 'नक्षत्र')}: ${pd['nakshatra']}', style: TextStyle(color: scheme.onSurface.withValues(alpha: 0.8))),
                       if (pd['speed'] != null)
-                        Text('Speed: ${(pd['speed'] as double).toStringAsFixed(3)}°/day',
+                        Text('${tr('Speed', 'गति')}: ${(pd['speed'] as double).toStringAsFixed(3)}°/${tr('day', 'दिन')}',
                             style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12)),
                     ],
                   ),
                   if (dignity != '-') ...[
                     const SizedBox(height: 8),
-                    Text('Dignity: $dignity', style: TextStyle(color: dignityColor)),
+                    Text('${tr('Dignity', 'गरिमा')}: ${L10n.dignity(dignity)}', style: TextStyle(color: dignityColor)),
+                  ],
+                  if (pd['key'] != null) ...[
+                    const SizedBox(height: 8),
+                    Text(Interpret.planetInHouse(pd['key'], pd['house'], pd['sign']), style: TextStyle(fontSize: 13, height: 1.4, color: scheme.onSurfaceVariant)),
                   ]
                 ],
               ),
@@ -100,11 +109,11 @@ class GrahaScreen extends ConsumerWidget {
         backgroundColor: Theme.of(context).colorScheme.secondary,
         foregroundColor: Theme.of(context).colorScheme.onSecondary,
         icon: const Icon(Icons.auto_awesome),
-        label: const Text('Ask AI'),
+        label: Text(tr('Ask AI', 'AI से पूछें')),
         onPressed: () => showAiSheet(
           context,
           ref,
-          title: 'Planetary Analysis',
+          title: tr('Planetary Analysis', 'ग्रह विश्लेषण'),
           profileId: profileId,
           prompt: 'Provide a detailed analysis of each planet in this Vedic birth chart based on its sign, '
               'house, nakshatra, dignity and retrogression.\n\n${ChartSummary.describe(chartData, name: name)}',

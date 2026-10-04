@@ -4,6 +4,8 @@ import 'conjunction_db.dart';
 import 'ephemeris.dart';
 import 'jaimini_math.dart';
 import 'knowledge_registry.dart';
+import 'l10n.dart';
+import 'plain/interpret.dart';
 import 'precision_math.dart';
 import 'shadbala_math.dart';
 import 'timing_math.dart';
@@ -12,34 +14,40 @@ import 'yogas_math.dart';
 
 /// Evidence layers (Volume 5 §17).
 enum EvidenceLayer {
-  natal('A', 'Natal promise'),
-  strength('B', 'Strength'),
-  dasha('C', 'Daśā activation'),
-  transit('D', 'Transit confirmation'),
-  varga('E', 'Varga confirmation'),
-  ashtakavarga('F', 'Ashtakavarga support');
+  natal('A', 'Natal promise', 'जन्म कुंडली का वादा'),
+  strength('B', 'Strength', 'बल'),
+  dasha('C', 'Daśā activation', 'दशा सक्रियता'),
+  transit('D', 'Transit confirmation', 'गोचर पुष्टि'),
+  varga('E', 'Varga confirmation', 'वर्ग पुष्टि'),
+  ashtakavarga('F', 'Ashtakavarga support', 'अष्टकवर्ग सहारा');
 
   final String level;
-  final String label;
-  const EvidenceLayer(this.level, this.label);
+  final String _en;
+  final String _hi;
+  const EvidenceLayer(this.level, this._en, this._hi);
+
+  String get label => tr(_en, _hi);
 }
 
 enum Polarity { support, obstruction, neutral }
 
 /// Technical evidence states (Volume 5 §18) - not guaranteed-event labels.
 enum PredictionStatus {
-  natalPromisePresent('NATAL_PROMISE_PRESENT', 'Natal chart contains relevant indicators'),
-  natalPromiseWeak('NATAL_PROMISE_WEAK', 'Indication exists but support is limited'),
-  natalContradiction('NATAL_CONTRADICTION', 'Significant opposing natal indicators'),
-  timingActive('TIMING_ACTIVE', 'Current Daśā activates relevant factors'),
-  transitConfirmed('TRANSIT_CONFIRMED', 'Transit independently activates the domain'),
-  vargaConfirmed('VARGA_CONFIRMED', 'Relevant Varga supports the indication'),
-  partialConvergence('PARTIAL_CONVERGENCE', 'Several layers agree, one or more absent or conflicting'),
-  insufficientData('INSUFFICIENT_DATA', 'Calculation cannot be completed');
+  natalPromisePresent('NATAL_PROMISE_PRESENT', 'Natal chart contains relevant indicators', 'जन्म कुंडली में संबंधित संकेत हैं'),
+  natalPromiseWeak('NATAL_PROMISE_WEAK', 'Indication exists but support is limited', 'संकेत है पर सहारा सीमित है'),
+  natalContradiction('NATAL_CONTRADICTION', 'Significant opposing natal indicators', 'जन्म कुंडली में प्रबल विरोधी संकेत'),
+  timingActive('TIMING_ACTIVE', 'Current Daśā activates relevant factors', 'वर्तमान दशा संबंधित कारकों को सक्रिय करती है'),
+  transitConfirmed('TRANSIT_CONFIRMED', 'Transit independently activates the domain', 'गोचर स्वतंत्र रूप से क्षेत्र को सक्रिय करता है'),
+  vargaConfirmed('VARGA_CONFIRMED', 'Relevant Varga supports the indication', 'संबंधित वर्ग संकेत का समर्थन करता है'),
+  partialConvergence('PARTIAL_CONVERGENCE', 'Several layers agree, one or more absent or conflicting', 'कई परतें सहमत, एक या अधिक अनुपस्थित या विरोधी'),
+  insufficientData('INSUFFICIENT_DATA', 'Calculation cannot be completed', 'गणना पूरी नहीं हो सकती');
 
   final String code;
-  final String label;
-  const PredictionStatus(this.code, this.label);
+  final String _en;
+  final String _hi;
+  const PredictionStatus(this.code, this._en, this._hi);
+
+  String get label => tr(_en, _hi);
 }
 
 /// Volume 6 §45 prediction states (not numerical rankings).
@@ -355,7 +363,11 @@ class SynthesisEngine {
 
   static final Map<String, int> _divisions = {for (final v in VedicMath.vargaDefs) v.key: v.div};
 
-  static String _n(String p) => VedicMath.planets[p]?.name ?? p;
+  static String _n(String p) => L10n.planet(p);
+
+  /// Hindi ordinal ("10वें") for house references inside Hindi sentences.
+  static String _h(int h) => '$hवें';
+  static String _dig(String d) => L10n.dignity(d);
   static String lordOf(ChartData c, int house) => VedicMath.rashis[(c.lagnaRashi + house - 1) % 12].lord;
   static int houseOfPlanet(ChartData c, String p) => VedicMath.houseOf(VedicMath.rashiIndex(c.planetLongitudes[p]!), c.lagnaRashi);
   static List<int> housesOwned(ChartData c, String p) => [for (int h = 1; h <= 12; h++) if (lordOf(c, h) == p) h];
@@ -393,18 +405,18 @@ class SynthesisEngine {
     final hl = houseOfPlanet(c, lord);
     final owned = housesOwned(c, lord);
     for (final h in domain.bhavas) {
-      if (owned.contains(h)) out.add('owns the ${VedicMath.ordinal(h)}');
-      if (hl == h) out.add('occupies the ${VedicMath.ordinal(h)}');
-      if (aspectingHouse(c, h, cfg).contains(lord)) out.add('aspects the ${VedicMath.ordinal(h)}');
+      if (owned.contains(h)) out.add(tr('owns the ${VedicMath.ordinal(h)}', '${_h(h)} भाव का स्वामी है'));
+      if (hl == h) out.add(tr('occupies the ${VedicMath.ordinal(h)}', '${_h(h)} भाव में स्थित है'));
+      if (aspectingHouse(c, h, cfg).contains(lord)) out.add(tr('aspects the ${VedicMath.ordinal(h)}', '${_h(h)} भाव को देखता है'));
       final hLord = lordOf(c, h);
       if (hLord != lord && VedicMath.rashiIndex(c.planetLongitudes[hLord]!) == VedicMath.rashiIndex(c.planetLongitudes[lord]!)) {
-        out.add('is joined with the ${VedicMath.ordinal(h)} lord');
+        out.add(tr('is joined with the ${VedicMath.ordinal(h)} lord', '${_h(h)} भाव के स्वामी के साथ है'));
       }
       if (hLord != lord && VedicMath.rashis[VedicMath.rashiIndex(c.planetLongitudes[hLord]!)].lord == lord) {
-        out.add('disposits the ${VedicMath.ordinal(h)} lord');
+        out.add(tr('disposits the ${VedicMath.ordinal(h)} lord', '${_h(h)} भाव के स्वामी का राशि स्वामी है'));
       }
     }
-    if (domain.karakas.contains(lord)) out.add('is a karaka of the domain');
+    if (domain.karakas.contains(lord)) out.add(tr('is a karaka of the domain', 'इस क्षेत्र का कारक है'));
     return out.toSet().toList();
   }
 
@@ -468,18 +480,21 @@ class SynthesisEngine {
         final dispRec = recs[dispositor]!;
         final disp2 = dispRec.dispositor;
         final disp2Rec = recs[disp2]!;
-        chains.add('${VedicMath.ordinal(h)} Bhāva → ${_n(lord)} → ${VedicMath.rashis[r.rashi].name} (house $hl) → '
-            '${_n(dispositor)} → house ${dispRec.house} (${dispRec.dignity}${sb.planets[dispositor] != null ? ', Shadbala ${sb.planets[dispositor]!.ratio.toStringAsFixed(2)}×' : ''})'
-            '${disp2 != dispositor ? ' → ${_n(disp2)} → house ${disp2Rec.house} (${disp2Rec.dignity})' : ' (own-sign terminus)'}');
+        chains.add('${tr('${VedicMath.ordinal(h)} Bhāva', '${_h(h)} भाव')} → ${_n(lord)} → ${L10n.sign(r.rashi)} (${tr('house', 'भाव')} $hl) → '
+            '${_n(dispositor)} → ${tr('house', 'भाव')} ${dispRec.house} (${_dig(dispRec.dignity)}${sb.planets[dispositor] != null ? ', ${tr('Shadbala', 'षड्बल')} ${sb.planets[dispositor]!.ratio.toStringAsFixed(2)}×' : ''})'
+            '${disp2 != dispositor ? ' → ${_n(disp2)} → ${tr('house', 'भाव')} ${disp2Rec.house} (${_dig(disp2Rec.dignity)})' : tr(' (own-sign terminus)', ' (स्वराशि पर समाप्त)')}');
         if (!primary && hl != h && !YogasMath.isDusthana(hl) && !YogasMath.isKendra(hl) && !YogasMath.isTrikona(hl)) continue;
         if (YogasMath.isDusthana(h) && YogasMath.isDusthana(hl)) {
-          add(EvidenceLayer.natal, Polarity.support, '${VedicMath.ordinal(h)} lord ${_n(lord)} in the ${VedicMath.ordinal(hl)}: a dusthana lord in a dusthana (Viparīta reversal).',
+          add(EvidenceLayer.natal, Polarity.support, tr('${VedicMath.ordinal(h)} lord ${_n(lord)} in the ${VedicMath.ordinal(hl)}: a dusthana lord in a dusthana (Viparīta reversal).',
+              '${_h(h)} भाव का स्वामी ${_n(lord)} ${_h(hl)} भाव में: दुःस्थान का स्वामी दुःस्थान में (विपरीत फल)।'),
               SourceTier.classicalDerived, 'Phaladeepika ch. 6 (Viparita)');
         } else if (hl == h || YogasMath.isKendra(hl) || YogasMath.isTrikona(hl) || hl == 11) {
-          add(EvidenceLayer.natal, Polarity.support, '${VedicMath.ordinal(h)} lord ${_n(lord)} is in the ${VedicMath.ordinal(hl)} (${hl == h ? 'its own house' : 'a good house'}).',
+          add(EvidenceLayer.natal, Polarity.support, tr('${VedicMath.ordinal(h)} lord ${_n(lord)} is in the ${VedicMath.ordinal(hl)} (${hl == h ? 'its own house' : 'a good house'}).',
+              '${_h(h)} भाव का स्वामी ${_n(lord)} ${_h(hl)} भाव में है (${hl == h ? 'अपना भाव' : 'शुभ भाव'})।'),
               SourceTier.classicalDerived, 'BPHS bhava-lord placement');
         } else if (YogasMath.isDusthana(hl)) {
-          add(EvidenceLayer.natal, Polarity.obstruction, '${VedicMath.ordinal(h)} lord ${_n(lord)} is in the ${VedicMath.ordinal(hl)}, a dusthana.',
+          add(EvidenceLayer.natal, Polarity.obstruction, tr('${VedicMath.ordinal(h)} lord ${_n(lord)} is in the ${VedicMath.ordinal(hl)}, a dusthana.',
+              '${_h(h)} भाव का स्वामी ${_n(lord)} ${_h(hl)} भाव (दुःस्थान) में है।'),
               SourceTier.classicalDerived, 'BPHS bhava-lord placement');
         }
         if (!primary) continue;
@@ -487,30 +502,32 @@ class SynthesisEngine {
         for (final p in occupants) {
           final ben = _naturalBenefic(c, p);
           if (ben) {
-            add(EvidenceLayer.natal, Polarity.support, '${_n(p)} (benefic) occupies the ${VedicMath.ordinal(h)}.', SourceTier.classicalDerived, 'Phaladeepika bhava analysis');
+            add(EvidenceLayer.natal, Polarity.support, tr('${_n(p)} (benefic) occupies the ${VedicMath.ordinal(h)}.', '${_n(p)} (शुभ ग्रह) ${_h(h)} भाव में है।'), SourceTier.classicalDerived, 'Phaladeepika bhava analysis');
           } else if (YogasMath.isUpachaya(h)) {
-            add(EvidenceLayer.natal, Polarity.support, '${_n(p)} (malefic) in the ${VedicMath.ordinal(h)}, an Upachaya, where malefics do well.', SourceTier.classicalDerived, 'Phaladeepika bhava analysis (Upachaya)');
+            add(EvidenceLayer.natal, Polarity.support, tr('${_n(p)} (malefic) in the ${VedicMath.ordinal(h)}, an Upachaya, where malefics do well.', '${_n(p)} (पाप ग्रह) ${_h(h)} भाव (उपचय) में, जहाँ पाप ग्रह अच्छा फल देते हैं।'), SourceTier.classicalDerived, 'Phaladeepika bhava analysis (Upachaya)');
           } else {
-            add(EvidenceLayer.natal, Polarity.obstruction, '${_n(p)} (malefic) occupies the ${VedicMath.ordinal(h)}.', SourceTier.classicalDerived, 'Phaladeepika bhava analysis');
+            add(EvidenceLayer.natal, Polarity.obstruction, tr('${_n(p)} (malefic) occupies the ${VedicMath.ordinal(h)}.', '${_n(p)} (पाप ग्रह) ${_h(h)} भाव में है।'), SourceTier.classicalDerived, 'Phaladeepika bhava analysis');
           }
         }
         for (final p in aspectingHouse(c, h, cfg)) {
           if (occupants.contains(p)) continue;
           final ben = _naturalBenefic(c, p);
           if (ben || YogasMath.isUpachaya(h)) {
-            add(EvidenceLayer.natal, ben ? Polarity.support : Polarity.neutral, '${_n(p)} aspects the ${VedicMath.ordinal(h)}.', SourceTier.classicalDerived, 'Parashari graha drishti');
+            add(EvidenceLayer.natal, ben ? Polarity.support : Polarity.neutral, tr('${_n(p)} aspects the ${VedicMath.ordinal(h)}.', '${_n(p)} की ${_h(h)} भाव पर दृष्टि है।'), SourceTier.classicalDerived, 'Parashari graha drishti');
           } else {
-            add(EvidenceLayer.natal, Polarity.obstruction, '${_n(p)} (malefic) aspects the ${VedicMath.ordinal(h)}.', SourceTier.classicalDerived, 'Parashari graha drishti');
+            add(EvidenceLayer.natal, Polarity.obstruction, tr('${_n(p)} (malefic) aspects the ${VedicMath.ordinal(h)}.', '${_n(p)} (पाप ग्रह) की ${_h(h)} भाव पर दृष्टि है।'), SourceTier.classicalDerived, 'Parashari graha drishti');
           }
         }
         for (final cj in conjunctions.where((x) => x.record.bhava == h)) {
           add(EvidenceLayer.natal, Polarity.neutral,
-              'Conjunction ${cj.record.clusterId} (${cj.record.clusterLabel}) in the ${VedicMath.ordinal(h)}; closest pair ${cj.closestPair == null ? '-' : '${_n(cj.closestPair!.a)}–${_n(cj.closestPair!.b)} ${cj.closestPair!.separation.toStringAsFixed(1)}°'}.',
+              tr('Conjunction ${cj.record.clusterId} (${cj.record.clusterLabel}) in the ${VedicMath.ordinal(h)}; closest pair ${cj.closestPair == null ? '-' : '${_n(cj.closestPair!.a)}–${_n(cj.closestPair!.b)} ${cj.closestPair!.separation.toStringAsFixed(1)}°'}.',
+                  '${_h(h)} भाव में युति ${cj.record.clusterId} (${cj.record.clusterLabel}); सबसे निकट जोड़ा ${cj.closestPair == null ? '-' : '${_n(cj.closestPair!.a)}–${_n(cj.closestPair!.b)} ${cj.closestPair!.separation.toStringAsFixed(1)}°'}।'),
               SourceTier.systematicSynthesis, 'Conjunction DB ${cj.record.recordId}');
           final rep = ConjunctionDb.vargaRepetition(c, cj.record.planets, [...{'D9', ...d.vargas.where((v) => v != 'D1')}]);
           if (rep.isNotEmpty) {
             rulesRun.add('R024');
-            add(EvidenceLayer.varga, Polarity.support, 'The ${cj.record.planets.map(_n).join('–')} conjunction repeats in ${rep.join(', ')}, which strengthens it.',
+            add(EvidenceLayer.varga, Polarity.support, tr('The ${cj.record.planets.map(_n).join('–')} conjunction repeats in ${rep.join(', ')}, which strengthens it.',
+                '${cj.record.planets.map(_n).join('–')} युति ${rep.join(', ')} में दोहराई गई है, जो इसे मज़बूत करती है।'),
                 SourceTier.systematicSynthesis, 'Varga repetition of a conjunction', ruleId: 'R024');
           }
         }
@@ -519,9 +536,9 @@ class SynthesisEngine {
         final r = recs[k];
         if (r == null) continue;
         if (r.dignity == 'Exalted' || r.dignity == 'Own Sign' || r.dignity == 'Moolatrikona') {
-          add(EvidenceLayer.natal, Polarity.support, 'Karaka ${_n(k)} is ${r.dignity.toLowerCase()}.', SourceTier.classicalDerived, 'Karaka layer (Vol. 5 §31)');
+          add(EvidenceLayer.natal, Polarity.support, tr('Karaka ${_n(k)} is ${r.dignity.toLowerCase()}.', 'कारक ${_n(k)} ${_dig(r.dignity)} है।'), SourceTier.classicalDerived, 'Karaka layer (Vol. 5 §31)');
         } else if (r.dignity == 'Debilitated' || r.combust) {
-          add(EvidenceLayer.natal, Polarity.obstruction, 'Karaka ${_n(k)} is ${r.combust ? 'combust' : 'debilitated'}.', SourceTier.classicalDerived, 'Karaka layer (Vol. 5 §31)');
+          add(EvidenceLayer.natal, Polarity.obstruction, tr('Karaka ${_n(k)} is ${r.combust ? 'combust' : 'debilitated'}.', 'कारक ${_n(k)} ${r.combust ? 'अस्त' : 'नीच'} है।'), SourceTier.classicalDerived, 'Karaka layer (Vol. 5 §31)');
         }
       }
       _jaiminiEvidence(c, d, jaimini, recs, add, rulesRun);
@@ -530,7 +547,8 @@ class SynthesisEngine {
         if (!y.planets.any(lords.contains)) continue;
         if (y.category.startsWith('Nabhasa') || y.category == YogaFamilies.arishta || y.category == YogaFamilies.pravrajya) continue;
         add(EvidenceLayer.natal, y.nature == YogaNature.adverse ? Polarity.obstruction : Polarity.support,
-            '${y.name} involves ${y.planets.where(lords.contains).map(_n).join(', ')} (${y.strength}).',
+            tr('${y.name} involves ${y.planets.where(lords.contains).map(_n).join(', ')} (${y.strength}).',
+                '${y.hindi} में ${y.planets.where(lords.contains).map(_n).join(', ')} शामिल (${Interpret.yogaStrength(y.strength)})।'),
             SourceTier.classicalDirect, y.source, ruleId: 'R016');
       }
 
@@ -539,26 +557,39 @@ class SynthesisEngine {
       final ps = sb.planets[primaryLord];
       if (ps != null) {
         add(EvidenceLayer.strength, ps.meetsMinimum ? Polarity.support : Polarity.obstruction,
-            '${d.bhavas.first == 1 ? 'Lagna' : VedicMath.ordinal(d.bhavas.first)} lord ${_n(primaryLord)}: Shadbala ${ps.rupas.toStringAsFixed(2)} rupas (${ps.ratio.toStringAsFixed(2)}× the minimum).',
+            tr('${d.bhavas.first == 1 ? 'Lagna' : VedicMath.ordinal(d.bhavas.first)} lord ${_n(primaryLord)}: Shadbala ${ps.rupas.toStringAsFixed(2)} rupas (${ps.ratio.toStringAsFixed(2)}× the minimum).',
+                '${d.bhavas.first == 1 ? 'लग्नेश' : '${_h(d.bhavas.first)} भाव का स्वामी'} ${_n(primaryLord)}: षड्बल ${ps.rupas.toStringAsFixed(2)} रूप (न्यूनतम का ${ps.ratio.toStringAsFixed(2)}×)।'),
             SourceTier.classicalDerived, 'BPHS Shadbala');
       }
       final bb = sb.bhavas[d.bhavas.first - 1];
       add(EvidenceLayer.strength, bb.total >= meanBhava ? Polarity.support : Polarity.obstruction,
-          'Bhāva Bala of the ${VedicMath.ordinal(d.bhavas.first)}: ${bb.rupas.toStringAsFixed(2)} rupas (chart average ${(meanBhava / 60).toStringAsFixed(2)}).',
+          tr('Bhāva Bala of the ${VedicMath.ordinal(d.bhavas.first)}: ${bb.rupas.toStringAsFixed(2)} rupas (chart average ${(meanBhava / 60).toStringAsFixed(2)}).',
+              '${_h(d.bhavas.first)} भाव का भाव बल: ${bb.rupas.toStringAsFixed(2)} रूप (कुंडली औसत ${(meanBhava / 60).toStringAsFixed(2)})।'),
           SourceTier.classicalDerived, 'Bhava Bala (Raman method)');
       final pr = recs[primaryLord]!;
-      if (pr.combust) add(EvidenceLayer.strength, Polarity.obstruction, '${_n(primaryLord)} is combust (${pr.sunDistance!.toStringAsFixed(1)}° from the Sun).', SourceTier.configurableTradition, 'Combustion orb table');
-      if (pr.vargottama) add(EvidenceLayer.strength, Polarity.support, '${_n(primaryLord)} is vargottama.', SourceTier.classicalDerived, 'Phaladeepika (Vargottama)');
-      if (pr.sandhi) add(EvidenceLayer.strength, Polarity.obstruction, '${_n(primaryLord)} is near a Bhāva-sandhi, which reduces effectiveness.', SourceTier.configurableTradition, 'Phaladeepika (Bhava-sandhi)');
-      if (pr.retrograde && !pr.isNode) add(EvidenceLayer.strength, Polarity.neutral, '${_n(primaryLord)} is retrograde (Cheṣṭā strength; delayed or repeated expression).', SourceTier.classicalDerived, 'Phaladeepika ch. 4');
+      final pn = _n(primaryLord);
+      if (pr.combust) {
+        add(EvidenceLayer.strength, Polarity.obstruction, tr('$pn is combust (${pr.sunDistance!.toStringAsFixed(1)}° from the Sun).', '$pn अस्त है (सूर्य से ${pr.sunDistance!.toStringAsFixed(1)}°)।'),
+            SourceTier.configurableTradition, 'Combustion orb table');
+      }
+      if (pr.vargottama) add(EvidenceLayer.strength, Polarity.support, tr('$pn is vargottama.', '$pn वर्गोत्तम है।'), SourceTier.classicalDerived, 'Phaladeepika (Vargottama)');
+      if (pr.sandhi) {
+        add(EvidenceLayer.strength, Polarity.obstruction, tr('$pn is near a Bhāva-sandhi, which reduces effectiveness.', '$pn भाव-संधि के पास है, जिससे प्रभाव कम होता है।'),
+            SourceTier.configurableTradition, 'Phaladeepika (Bhava-sandhi)');
+      }
+      if (pr.retrograde && !pr.isNode) {
+        add(EvidenceLayer.strength, Polarity.neutral, tr('$pn is retrograde (Cheṣṭā strength; delayed or repeated expression).', '$pn वक्री है (चेष्टा बल; फल देर से या बार-बार)।'),
+            SourceTier.classicalDerived, 'Phaladeepika ch. 4');
+      }
       for (final w in wars.where((w) => w.a == primaryLord || w.b == primaryLord)) {
         add(EvidenceLayer.strength, w.winner == primaryLord ? Polarity.support : Polarity.obstruction,
-            '${_n(primaryLord)} is in planetary war with ${_n(w.a == primaryLord ? w.b : w.a)} and ${w.winner == primaryLord ? 'wins' : (w.winner == null ? 'the result is undetermined' : 'loses')}.',
+            tr('${_n(primaryLord)} is in planetary war with ${_n(w.a == primaryLord ? w.b : w.a)} and ${w.winner == primaryLord ? 'wins' : (w.winner == null ? 'the result is undetermined' : 'loses')}.',
+                '${_n(primaryLord)} का ${_n(w.a == primaryLord ? w.b : w.a)} से ग्रह युद्ध है और वह ${w.winner == primaryLord ? 'जीतता है' : (w.winner == null ? 'अनिश्चित है' : 'हारता है')}।'),
             SourceTier.configurableTradition, w.rule, ruleId: 'R010');
       }
-      if (pr.dignity == 'Debilitated') add(EvidenceLayer.strength, Polarity.obstruction, '${_n(primaryLord)} is debilitated.', SourceTier.classicalDerived, 'Dignity');
+      if (pr.dignity == 'Debilitated') add(EvidenceLayer.strength, Polarity.obstruction, tr('$pn is debilitated.', '$pn नीच का है।'), SourceTier.classicalDerived, 'Dignity');
       if (pr.dignity == 'Exalted' || pr.dignity == 'Moolatrikona' || pr.dignity == 'Own Sign') {
-        add(EvidenceLayer.strength, Polarity.support, '${_n(primaryLord)} is ${pr.dignity.toLowerCase()}.', SourceTier.classicalDerived, 'Dignity');
+        add(EvidenceLayer.strength, Polarity.support, tr('$pn is ${pr.dignity.toLowerCase()}.', '$pn ${_dig(pr.dignity)} है।'), SourceTier.classicalDerived, 'Dignity');
       }
 
       // ---------------- E: varga (every supporting Varga of the domain) ----------------
@@ -573,12 +604,13 @@ class SynthesisEngine {
         final good = YogasMath.isKendra(vHouse) || YogasMath.isTrikona(vHouse) || dign == 'exalted' || dign == 'in its own sign';
         final bad = YogasMath.isDusthana(vHouse) || dign == 'debilitated';
         add(EvidenceLayer.varga, good && !bad ? Polarity.support : (bad && !good ? Polarity.obstruction : Polarity.neutral),
-            '$vk: ${_n(primaryLord)} in ${VedicMath.rashis[vSign].name}, house $vHouse from the $vk Lagna${dign != null ? ', $dign' : ''}.',
+            tr('$vk: ${_n(primaryLord)} in ${VedicMath.rashis[vSign].name}, house $vHouse from the $vk Lagna${dign != null ? ', $dign' : ''}.',
+                '$vk: ${_n(primaryLord)} ${L10n.sign(vSign)} में, $vk लग्न से $vHouseवें भाव में${dign == null ? '' : ', ${dign == 'exalted' ? 'उच्च' : (dign == 'debilitated' ? 'नीच' : 'स्वराशि')}'}।'),
             SourceTier.classicalDerived, 'BPHS Shodashavarga');
       }
 
       // ---------------- C: dasha ----------------
-      const levels = ['Mahādaśā', 'Antardaśā', 'Pratyantardaśā', 'Sūkṣmadaśā'];
+      final levels = L10n.hi ? const ['महादशा', 'अंतर्दशा', 'प्रत्यंतर्दशा', 'सूक्ष्मदशा'] : const ['Mahādaśā', 'Antardaśā', 'Pratyantardaśā', 'Sūkṣmadaśā'];
       final activeLevels = <int>[];
       for (int i = 0; i < running.length && i < 3; i++) {
         final lord = running[i].lord;
@@ -586,7 +618,8 @@ class SynthesisEngine {
         if (reasons.isNotEmpty) {
           activeLevels.add(i);
           add(EvidenceLayer.dasha, i < 2 ? Polarity.support : Polarity.neutral,
-              '${levels[i]} lord ${_n(lord)} ${reasons.join(', ')} (${running[i].startDate} – ${running[i].endDate}).',
+              tr('${levels[i]} lord ${_n(lord)} ${reasons.join(', ')} (${running[i].startDate} – ${running[i].endDate}).',
+                  '${levels[i]} स्वामी ${_n(lord)}: ${reasons.join(', ')} (${running[i].startDate} – ${running[i].endDate})।'),
               SourceTier.classicalDerived, 'Phaladeepika Dasha chapters; BPHS');
         }
       }
@@ -595,16 +628,19 @@ class SynthesisEngine {
         if (m != a && c.planetLongitudes.containsKey(m) && c.planetLongitudes.containsKey(a)) {
           final dist = VedicMath.houseOf(VedicMath.rashiIndex(c.planetLongitudes[a]!), VedicMath.rashiIndex(c.planetLongitudes[m]!));
           if (const [6, 8, 12].contains(dist)) {
-            add(EvidenceLayer.dasha, Polarity.obstruction, 'Antardaśā lord ${_n(a)} is ${VedicMath.ordinal(dist)} from the Mahādaśā lord ${_n(m)} (6/8/12 relationship).',
+            add(EvidenceLayer.dasha, Polarity.obstruction, tr('Antardaśā lord ${_n(a)} is ${VedicMath.ordinal(dist)} from the Mahādaśā lord ${_n(m)} (6/8/12 relationship).',
+                'अंतर्दशा स्वामी ${_n(a)} महादशा स्वामी ${_n(m)} से $distवें स्थान पर है (6/8/12 संबंध)।'),
                 SourceTier.classicalDerived, 'BPHS Antardasha relationship');
           } else if (YogasMath.isKendra(dist) || YogasMath.isTrikona(dist)) {
-            add(EvidenceLayer.dasha, Polarity.neutral, 'Antardaśā lord ${_n(a)} is ${VedicMath.ordinal(dist)} from the Mahādaśā lord ${_n(m)} (supportive relationship).',
+            add(EvidenceLayer.dasha, Polarity.neutral, tr('Antardaśā lord ${_n(a)} is ${VedicMath.ordinal(dist)} from the Mahādaśā lord ${_n(m)} (supportive relationship).',
+                'अंतर्दशा स्वामी ${_n(a)} महादशा स्वामी ${_n(m)} से $distवें स्थान पर है (सहायक संबंध)।'),
                 SourceTier.classicalDerived, 'BPHS Antardasha relationship');
           }
         }
       }
       if (activeLevels.isEmpty && running.isNotEmpty) {
-        add(EvidenceLayer.dasha, Polarity.neutral, 'The current Daśā lords (${running.take(2).map((x) => _n(x.lord)).join(' / ')}) are not directly connected with this domain.',
+        add(EvidenceLayer.dasha, Polarity.neutral, tr('The current Daśā lords (${running.take(2).map((x) => _n(x.lord)).join(' / ')}) are not directly connected with this domain.',
+            'वर्तमान दशा स्वामी (${running.take(2).map((x) => _n(x.lord)).join(' / ')}) इस क्षेत्र से सीधे नहीं जुड़े हैं।'),
             SourceTier.classicalDerived, 'Daśā activation rule (Vol. 5 §10)');
       }
 
@@ -613,28 +649,30 @@ class SynthesisEngine {
       final domainTriggers = triggersFor(c, d, allTriggers);
       if (transit != null) {
         for (final tp in ['jupiter', 'saturn', 'rahu']) {
-          final tr = VedicMath.rashiIndex(transit.planetLongitudes[tp]!);
+          final ts = VedicMath.rashiIndex(transit.planetLongitudes[tp]!);
           for (final h in d.bhavas.take(2)) {
             final target = (c.lagnaRashi + h - 1) % 12;
-            final dist = VedicMath.houseOf(target, tr);
+            final dist = VedicMath.houseOf(target, ts);
             final aspects = PrecisionMath.aspectHouses(tp, cfg).contains(dist);
-            if (tr == target || aspects) {
-              final support = AshtakavargaMath.transitSupport(av, tp, tr);
-              final bindus = av.bindusFor(tp, tr);
+            if (ts == target || aspects) {
+              final support = AshtakavargaMath.transitSupport(av, tp, ts);
+              final bindus = av.bindusFor(tp, ts);
               add(EvidenceLayer.transit, tp == 'jupiter' || (tp == 'saturn' && YogasMath.isUpachaya(h)) ? Polarity.support : Polarity.neutral,
-                  'Transit ${_n(tp)} in ${VedicMath.rashis[tr].name} ${tr == target ? 'passes through' : 'aspects'} the ${VedicMath.ordinal(h)}'
-                  '${tp == 'rahu' ? '' : '; $support'}.',
+                  tr('Transit ${_n(tp)} in ${VedicMath.rashis[ts].name} ${ts == target ? 'passes through' : 'aspects'} the ${VedicMath.ordinal(h)}${tp == 'rahu' ? '' : '; $support'}.',
+                      'गोचर ${_n(tp)} ${L10n.sign(ts)} में ${ts == target ? '${_h(h)} भाव से गुज़र रहा है' : '${_h(h)} भाव को देख रहा है'}${tp == 'rahu' ? '' : '; $support'}।'),
                   SourceTier.classicalDerived, 'Phaladeepika transit chapter; BPHS Ashtakavarga', ruleId: 'R005');
               if (tp != 'rahu' && bindus < 4 && tp == 'jupiter') {
-                add(EvidenceLayer.ashtakavarga, Polarity.obstruction, 'Transit Jupiter has only $bindus bindus in ${VedicMath.rashis[tr].name}.', SourceTier.classicalDerived, 'BPHS Ashtakavarga', ruleId: 'R006');
+                add(EvidenceLayer.ashtakavarga, Polarity.obstruction, tr('Transit Jupiter has only $bindus bindus in ${VedicMath.rashis[ts].name}.', 'गोचर गुरु के ${L10n.sign(ts)} में केवल $bindus बिंदु हैं।'),
+                    SourceTier.classicalDerived, 'BPHS Ashtakavarga', ruleId: 'R006');
               }
             }
           }
           final natalLord = lordOf(c, d.bhavas.first);
           final lordSign = VedicMath.rashiIndex(c.planetLongitudes[natalLord]!);
-          if (tp != 'rahu' && (tr == lordSign || PrecisionMath.aspectHouses(tp, cfg).contains(VedicMath.houseOf(lordSign, tr)))) {
+          if (tp != 'rahu' && (ts == lordSign || PrecisionMath.aspectHouses(tp, cfg).contains(VedicMath.houseOf(lordSign, ts)))) {
             add(EvidenceLayer.transit, tp == 'jupiter' ? Polarity.support : Polarity.neutral,
-                'Transit ${_n(tp)} ${tr == lordSign ? 'joins' : 'aspects'} the natal ${VedicMath.ordinal(d.bhavas.first)} lord ${_n(natalLord)}.',
+                tr('Transit ${_n(tp)} ${ts == lordSign ? 'joins' : 'aspects'} the natal ${VedicMath.ordinal(d.bhavas.first)} lord ${_n(natalLord)}.',
+                    'गोचर ${_n(tp)} जन्म कुंडली के ${_h(d.bhavas.first)} भाव के स्वामी ${_n(natalLord)} ${ts == lordSign ? 'के साथ है' : 'को देख रहा है'}।'),
                 SourceTier.classicalDerived, 'Phaladeepika transit chapter');
           }
         }
@@ -642,16 +680,17 @@ class SynthesisEngine {
           final lord = x.lord;
           if (!transit.planetLongitudes.containsKey(lord) || lord == 'rahu' || lord == 'ketu') continue;
           if (activationReasons(c, lord, d, cfg).isEmpty) continue;
-          final tr = VedicMath.rashiIndex(transit.planetLongitudes[lord]!);
+          final ts = VedicMath.rashiIndex(transit.planetLongitudes[lord]!);
           final p = VedicMath.planets[lord]!;
-          if (p.exalt == tr || p.ownSigns.contains(tr)) {
-            add(EvidenceLayer.transit, Polarity.support, 'Daśā lord ${_n(lord)} transits its ${p.exalt == tr ? 'exaltation' : 'own'} sign ${VedicMath.rashis[tr].name}, strengthening the houses it represents.',
+          if (p.exalt == ts || p.ownSigns.contains(ts)) {
+            add(EvidenceLayer.transit, Polarity.support, tr('Daśā lord ${_n(lord)} transits its ${p.exalt == ts ? 'exaltation' : 'own'} sign ${VedicMath.rashis[ts].name}, strengthening the houses it represents.',
+                'दशा स्वामी ${_n(lord)} अपनी ${p.exalt == ts ? 'उच्च' : 'स्व'} राशि ${L10n.sign(ts)} में गोचर कर रहा है, जिससे उसके भाव मज़बूत होते हैं।'),
                 SourceTier.classicalDirect, 'Phaladeepika (transit of the Daśā planet)', ruleId: 'R005');
           }
         }
         for (final t in domainTriggers.where((t) => t.activeAt(now))) {
           add(EvidenceLayer.transit, t.transit == 'jupiter' ? Polarity.support : Polarity.neutral,
-              '${t.summary}; ${t.applyingAt(now) ? 'applying' : 'separating'} now.',
+              '${t.summary}; ${t.applyingAt(now) ? tr('applying', 'निकट आ रहा') : tr('separating', 'दूर जा रहा')} ${tr('now', 'अभी')}.',
               SourceTier.systematicSynthesis, 'Degree-exact transit trigger', ruleId: 'R021');
         }
         contacts.addAll(_ingresses(c, d, now));
@@ -660,7 +699,8 @@ class SynthesisEngine {
       // ---------------- F: ashtakavarga ----------------
       final sav = av.sarvaInHouse(d.bhavas.first);
       add(EvidenceLayer.ashtakavarga, sav >= 28 ? Polarity.support : (sav < 25 ? Polarity.obstruction : Polarity.neutral),
-          'Sarvāṣṭakavarga of the ${VedicMath.ordinal(d.bhavas.first)}: $sav bindus (28 is average).', SourceTier.classicalDerived, 'BPHS Ashtakavarga');
+          tr('Sarvāṣṭakavarga of the ${VedicMath.ordinal(d.bhavas.first)}: $sav bindus (28 is average).', '${_h(d.bhavas.first)} भाव का सर्वाष्टकवर्ग: $sav बिंदु (28 औसत है)।'),
+          SourceTier.classicalDerived, 'BPHS Ashtakavarga');
 
       // ---------------- status ----------------
       final ordered = [for (final l in EvidenceLayer.values) ...ev.where((e) => e.layer == l)];
@@ -806,8 +846,11 @@ class SynthesisEngine {
       final good = r.dignity == 'Exalted' || r.dignity == 'Own Sign' || r.dignity == 'Moolatrikona';
       final bad = r.dignity == 'Debilitated' || r.combust;
       add(EvidenceLayer.natal, good || (link && !bad) ? Polarity.support : (bad ? Polarity.obstruction : Polarity.neutral),
-          '${k.name} (${k.code}, ${k.signifies}) is ${_n(k.planet)} in the ${VedicMath.ordinal(h)}${link ? ', linked to the ${VedicMath.ordinal(house)}' : ''}'
-          '${good || bad ? ' (${bad ? (r.combust ? 'combust' : 'debilitated') : r.dignity.toLowerCase()})' : ''}.',
+          tr(
+              '${k.name} (${k.code}, ${k.signifies}) is ${_n(k.planet)} in the ${VedicMath.ordinal(h)}${link ? ', linked to the ${VedicMath.ordinal(house)}' : ''}'
+                  '${good || bad ? ' (${bad ? (r.combust ? 'combust' : 'debilitated') : r.dignity.toLowerCase()})' : ''}.',
+              '${k.name} (${k.code}, ${k.signifies}) ${_n(k.planet)} है, ${_h(h)} भाव में${link ? ', ${_h(house)} भाव से जुड़ा' : ''}'
+                  '${good || bad ? ' (${bad ? (r.combust ? 'अस्त' : 'नीच') : _dig(r.dignity)})' : ''}।'),
           SourceTier.configurableTradition, 'Jaimini Chara Karaka (${j.scheme}-karaka scheme)', ruleId: 'R019');
     }
 
@@ -824,8 +867,11 @@ class SynthesisEngine {
           if (c.planetLongitudes.containsKey(p) && VedicMath.houseOf(VedicMath.rashiIndex(c.planetLongitudes[p]!), a.rashi) == 2) p,
       ];
       add(EvidenceLayer.natal, benefics.isNotEmpty && malefics.isEmpty ? Polarity.support : (malefics.isNotEmpty && benefics.isEmpty ? Polarity.obstruction : Polarity.neutral),
-          '${a.name} (${a.code}, $meaning) falls in ${VedicMath.rashis[a.rashi].name}, the ${VedicMath.ordinal(a.fromLagna)} from the Lagna; its lord ${_n(lord)} is in house ${lr.house}'
-          '${benefics.isNotEmpty ? '; benefics ${benefics.map(_n).join(', ')} in the 2nd from it' : ''}${malefics.isNotEmpty ? '; malefics ${malefics.map(_n).join(', ')} in the 2nd from it' : ''}.',
+          tr(
+              '${a.name} (${a.code}, $meaning) falls in ${VedicMath.rashis[a.rashi].name}, the ${VedicMath.ordinal(a.fromLagna)} from the Lagna; its lord ${_n(lord)} is in house ${lr.house}'
+                  '${benefics.isNotEmpty ? '; benefics ${benefics.map(_n).join(', ')} in the 2nd from it' : ''}${malefics.isNotEmpty ? '; malefics ${malefics.map(_n).join(', ')} in the 2nd from it' : ''}.',
+              '${a.name} (${a.code}, $meaning) ${L10n.sign(a.rashi)} राशि में, लग्न से ${_h(a.fromLagna)} भाव में; इसका स्वामी ${_n(lord)} भाव ${lr.house} में'
+                  '${benefics.isNotEmpty ? '; इससे दूसरे भाव में शुभ ग्रह ${benefics.map(_n).join(', ')}' : ''}${malefics.isNotEmpty ? '; इससे दूसरे भाव में पाप ग्रह ${malefics.map(_n).join(', ')}' : ''}।'),
           SourceTier.classicalDerived, 'Jaimini Arudha / Upapada', ruleId: 'R020');
     }
 
@@ -834,10 +880,10 @@ class SynthesisEngine {
         karaka('AmK', 10);
       case 'marriage':
         karaka('DK', 7);
-        pada(j.upapada, 'marriage and its continuity');
+        pada(j.upapada, tr('marriage and its continuity', 'विवाह और उसकी निरंतरता'));
       case 'identity':
         karaka('AK', 1);
-        pada(j.arudhaLagna, 'public image');
+        pada(j.arudhaLagna, tr('public image', 'सार्वजनिक छवि'));
       case 'children':
         karaka('PK', 5);
       case 'home':
@@ -971,23 +1017,37 @@ class SynthesisEngine {
 
   /// Evidence-calibrated wording (Volume 5 §35); never deterministic.
   static String _language(LifeDomain d, int agreeing, int plus, int minus, bool dasha, bool transit, Set<PredictionStatus> st) {
-    final theme = d.name.toLowerCase();
+    final theme = L10n.hi ? Interpret.domainName(d) : d.name.toLowerCase();
     String s;
     if (st.contains(PredictionStatus.insufficientData)) {
-      s = 'The available data do not establish this reliably.';
+      s = tr('The available data do not establish this reliably.', 'उपलब्ध जानकारी से यह विश्वसनीय रूप से स्थापित नहीं होता।');
     } else if (st.contains(PredictionStatus.natalContradiction)) {
-      s = 'The chart contains both supporting and obstructing indicators for $theme; the result is conditional on the modifying factors listed.';
+      s = tr('The chart contains both supporting and obstructing indicators for $theme; the result is conditional on the modifying factors listed.',
+          'कुंडली में $theme के लिए सहायक और बाधक दोनों संकेत हैं; परिणाम सूचीबद्ध संशोधक कारकों पर निर्भर है।');
     } else if (agreeing >= 4) {
-      s = 'The chart contains multiple converging indications for $theme: the natal promise is supported, the active period directly connects with it, and the timing is reinforced by transits.';
+      s = tr('The chart contains multiple converging indications for $theme: the natal promise is supported, the active period directly connects with it, and the timing is reinforced by transits.',
+          'कुंडली में $theme के लिए कई मिलते-जुलते संकेत हैं: जन्म का वादा समर्थित है, चल रही दशा सीधे इससे जुड़ी है और गोचर समय को मज़बूत करता है।');
     } else if (agreeing >= 2) {
-      s = 'The chart indicates $theme, but ${!dasha ? 'the current Daśā does not strongly activate it' : (!transit ? 'transit support is partial' : 'Varga confirmation is limited')}. '
-          '${minus > 0 ? 'Several factors support it while $minus modify the result.' : ''}';
+      s = tr(
+          'The chart indicates $theme, but ${!dasha ? 'the current Daśā does not strongly activate it' : (!transit ? 'transit support is partial' : 'Varga confirmation is limited')}. '
+              '${minus > 0 ? 'Several factors support it while $minus modify the result.' : ''}',
+          'कुंडली $theme का संकेत देती है, पर ${!dasha ? 'वर्तमान दशा इसे प्रबल रूप से सक्रिय नहीं करती' : (!transit ? 'गोचर का सहारा आंशिक है' : 'वर्ग पुष्टि सीमित है')}। '
+              '${minus > 0 ? 'कई कारक इसका समर्थन करते हैं जबकि $minus परिणाम को बदलते हैं।' : ''}');
     } else {
-      s = 'The theme of $theme is present in the chart with limited support and is not strongly activated at present.';
+      s = tr('The theme of $theme is present in the chart with limited support and is not strongly activated at present.',
+          '$theme का विषय कुंडली में सीमित समर्थन के साथ है और अभी प्रबल रूप से सक्रिय नहीं है।');
     }
-    if (d.caution != null) s = '$s ${d.caution}';
+    if (d.caution != null) s = '$s ${domainCaution(d)}';
     return s.trim();
   }
+
+  static String? domainCaution(LifeDomain d) => d.caution == null
+      ? null
+      : tr(d.caution!, switch (d.id) {
+          'wealth' => 'कर्ज़ और हानि अलग से 6, 8 और 12वें भाव से देखे जाते हैं।',
+          'health' => 'यह केवल पारंपरिक संकेत है; चिकित्सकीय मूल्यांकन नहीं।',
+          _ => d.caution!,
+        });
 
   /// Future Antardaśās (next ~15 years) whose lords activate the domain, with
   /// Pratyantardaśā peaks inside them.
@@ -1012,8 +1072,8 @@ class SynthesisEngine {
           ad.startDate,
           ad.endDate,
           [
-            if (mdReasons.isNotEmpty) 'MD ${_n(md.lord)} ${mdReasons.join(', ')}',
-            'AD ${_n(ad.lord)} ${adReasons.join(', ')}',
+            if (mdReasons.isNotEmpty) '${tr('MD', 'महादशा')} ${_n(md.lord)}: ${mdReasons.join(', ')}',
+            '${tr('AD', 'अंतर्दशा')} ${_n(ad.lord)}: ${adReasons.join(', ')}',
           ],
           peaks,
         ));
@@ -1035,14 +1095,16 @@ class SynthesisEngine {
         if (prev != null && r == target && prev != target) {
           entries++;
           out.add(TransitContact(p, r, jd, VedicMath.jdToDate(jd + c.utcOffset / 24), entries > 1 || speed < 0,
-              '${_n(p)} enters ${VedicMath.rashis[r].name} (the ${VedicMath.ordinal(d.bhavas.first)})${entries > 1 ? ' again after retrogression' : ''}'));
+              tr('${_n(p)} enters ${VedicMath.rashis[r].name} (the ${VedicMath.ordinal(d.bhavas.first)})${entries > 1 ? ' again after retrogression' : ''}',
+                  '${_n(p)} ${L10n.sign(r)} (${_h(d.bhavas.first)} भाव) में प्रवेश${entries > 1 ? ' — वक्री होने के बाद फिर से' : ''}')));
         }
         prev = r;
       }
       if (prev == null) continue;
       final (lon0, _) = Ephemeris.siderealPosition(p, now);
       if (VedicMath.rashiIndex(lon0) == target && out.where((t) => t.planet == p).isEmpty) {
-        out.add(TransitContact(p, target, now, VedicMath.jdToDate(now + c.utcOffset / 24), false, '${_n(p)} is already in ${VedicMath.rashis[target].name}'));
+        out.add(TransitContact(p, target, now, VedicMath.jdToDate(now + c.utcOffset / 24), false,
+            tr('${_n(p)} is already in ${VedicMath.rashis[target].name}', '${_n(p)} पहले से ${L10n.sign(target)} में है')));
       }
     }
     out.sort((a, b) => a.jd.compareTo(b.jd));
@@ -1055,21 +1117,23 @@ class SynthesisEngine {
     final ascDeg = VedicMath.degInRashi(c.ascendantSidereal);
     final edge = ascDeg < 15 ? ascDeg : 30 - ascDeg;
     if (edge < 0.25) {
-      out.add(InputFlag('critical', 'The Lagna is ${edge.toStringAsFixed(2)}° from a sign boundary: about one minute of birth time changes the Lagna and every house.'));
+      out.add(InputFlag('critical', tr('The Lagna is ${edge.toStringAsFixed(2)}° from a sign boundary: about one minute of birth time changes the Lagna and every house.',
+          'लग्न राशि सीमा से ${edge.toStringAsFixed(2)}° पर है: जन्म समय में लगभग एक मिनट का अंतर लग्न और सभी भाव बदल देता है।')));
     } else if (edge < 1) {
-      out.add(InputFlag('warning', 'The Lagna is ${edge.toStringAsFixed(2)}° from a sign boundary: a few minutes of birth time change the houses.'));
+      out.add(InputFlag('warning', tr('The Lagna is ${edge.toStringAsFixed(2)}° from a sign boundary: a few minutes of birth time change the houses.',
+          'लग्न राशि सीमा से ${edge.toStringAsFixed(2)}° पर है: जन्म समय में कुछ मिनट का अंतर भाव बदल देता है।')));
     }
     final moon = c.planetLongitudes['moon'];
     if (moon != null) {
       const span = 360 / 27;
       final into = VedicMath.norm360(moon) % span;
       if (into < 0.15 || span - into < 0.15) {
-        out.add(const InputFlag('warning', 'The Moon is at a nakshatra boundary: the starting Daśā lord depends on the exact birth time.'));
+        out.add(InputFlag('warning', tr('The Moon is at a nakshatra boundary: the starting Daśā lord depends on the exact birth time.', 'चन्द्र नक्षत्र सीमा पर है: पहली दशा का स्वामी सटीक जन्म समय पर निर्भर है।')));
       }
     }
     final sandhi = PrecisionMath.records(c, cfg).values.where((r) => r.sandhi).map((r) => r.name).toList();
-    if (sandhi.isNotEmpty) out.add(InputFlag('info', 'Near a Bhāva-sandhi: ${sandhi.join(', ')}.'));
-    out.add(const InputFlag('info', 'Birth time is recorded to the minute (no seconds); degree-sensitive results assume it is exact.'));
+    if (sandhi.isNotEmpty) out.add(InputFlag('info', '${tr('Near a Bhāva-sandhi', 'भाव-संधि के पास')}: ${sandhi.join(', ')}.'));
+    out.add(InputFlag('info', tr('Birth time is recorded to the minute (no seconds); degree-sensitive results assume it is exact.', 'जन्म समय मिनट तक दर्ज है (सेकंड नहीं); अंश-संवेदनशील परिणाम इसे सटीक मानते हैं।')));
     return out;
   }
 
@@ -1109,9 +1173,11 @@ class SynthesisEngine {
       final ad = periods.length > 1 ? activationReasons(chart, periods[1].lord, d, cfg) : <String>[];
       if (md.isNotEmpty && ad.isNotEmpty) activated.add(d.id);
       if (d.id == e.domainId) {
-        if (md.isNotEmpty) trace.add('Natal (known before the event): MD ${_n(periods[0].lord)} ${md.join(', ')}');
-        if (ad.isNotEmpty) trace.add('Natal (known before the event): AD ${_n(periods[1].lord)} ${ad.join(', ')}');
-        if (md.isEmpty && ad.isEmpty) trace.add('Neither the MD nor the AD lord connects with ${d.name.toLowerCase()}.');
+        if (md.isNotEmpty) trace.add('${tr('Natal (known before the event): MD', 'जन्म कुंडली (घटना से पहले ज्ञात): महादशा')} ${_n(periods[0].lord)} ${md.join(', ')}');
+        if (ad.isNotEmpty) trace.add('${tr('Natal (known before the event): AD', 'जन्म कुंडली (घटना से पहले ज्ञात): अंतर्दशा')} ${_n(periods[1].lord)} ${ad.join(', ')}');
+        if (md.isEmpty && ad.isEmpty) {
+          trace.add(tr('Neither the MD nor the AD lord connects with ${d.name.toLowerCase()}.', 'न महादशा न अंतर्दशा का स्वामी ${Interpret.domainName(d)} से जुड़ता है।'));
+        }
       }
     }
     try {
@@ -1119,10 +1185,11 @@ class SynthesisEngine {
       final d = domain(e.domainId);
       final target = (chart.lagnaRashi + d.bhavas.first - 1) % 12;
       for (final p in ['jupiter', 'saturn']) {
-        final tr = VedicMath.rashiIndex(t.planetLongitudes[p]!);
-        final dist = VedicMath.houseOf(target, tr);
-        if (tr == target || PrecisionMath.aspectHouses(p, cfg).contains(dist)) {
-          trace.add('Transit at the event: ${_n(p)} in ${VedicMath.rashis[tr].name} ${tr == target ? 'in' : 'aspecting'} the ${VedicMath.ordinal(d.bhavas.first)}.');
+        final ts = VedicMath.rashiIndex(t.planetLongitudes[p]!);
+        final dist = VedicMath.houseOf(target, ts);
+        if (ts == target || PrecisionMath.aspectHouses(p, cfg).contains(dist)) {
+          trace.add(tr('Transit at the event: ${_n(p)} in ${VedicMath.rashis[ts].name} ${ts == target ? 'in' : 'aspecting'} the ${VedicMath.ordinal(d.bhavas.first)}.',
+              'घटना के समय गोचर: ${_n(p)} ${L10n.sign(ts)} में, ${_h(d.bhavas.first)} भाव ${ts == target ? 'में' : 'पर दृष्टि'}।'));
         }
       }
     } catch (_) {}
@@ -1144,12 +1211,12 @@ class SynthesisEngine {
       final c = chartAt(m);
       double score = 0;
       final details = <String>[
-        'Lagna ${VedicMath.rashis[c.lagnaRashi].name} ${VedicMath.formatDegree(c.ascendantSidereal)}',
-        'D9 Lagna ${VedicMath.rashis[VedicMath.vargaRashi(c.ascendantSidereal, 'D9', 9)].name}, '
-            'D10 Lagna ${VedicMath.rashis[VedicMath.vargaRashi(c.ascendantSidereal, 'D10', 10)].name}',
+        '${tr('Lagna', 'लग्न')} ${L10n.sign(c.lagnaRashi)} ${VedicMath.formatDegree(c.ascendantSidereal)}',
+        '${tr('D9 Lagna', 'D9 लग्न')} ${L10n.sign(VedicMath.vargaRashi(c.ascendantSidereal, 'D9', 9))}, '
+            '${tr('D10 Lagna', 'D10 लग्न')} ${L10n.sign(VedicMath.vargaRashi(c.ascendantSidereal, 'D10', 10))}',
       ];
       final first = DashaCalculations.compute(c.jd, c.planetLongitudes['moon']!, utcOffset: c.utcOffset).mahadashas.first;
-      details.add('Daśā balance: ${_n(first.lord)} ${((first.endJD - c.jd) / DashaCalculations.yearDays).toStringAsFixed(2)} years');
+      details.add('${tr('Daśā balance', 'दशा शेष')}: ${_n(first.lord)} ${((first.endJD - c.jd) / DashaCalculations.yearDays).toStringAsFixed(2)} ${tr('years', 'वर्ष')}');
       for (final e in events) {
         final jd = Ephemeris.julianDay(e.date.year, e.date.month, e.date.day, 12 - c.utcOffset);
         final periods = periodsAt(c, jd);
@@ -1159,8 +1226,8 @@ class SynthesisEngine {
         final pd = periods.length > 2 ? activationReasons(c, periods[2].lord, d, cfg).length : 0;
         final s = (md > 0 ? 1 : 0) + (ad > 0 ? 1.5 : 0) + (pd > 0 ? 0.5 : 0);
         score += s;
-        details.add('${e.date.year}-${e.date.month.toString().padLeft(2, '0')} ${d.name}: '
-            '${periods.take(3).map((p) => _n(p.lord)).join('/')} → ${s == 0 ? 'no activation' : '+${s.toStringAsFixed(1)}'}');
+        details.add('${e.date.year}-${e.date.month.toString().padLeft(2, '0')} ${Interpret.domainName(d)}: '
+            '${periods.take(3).map((p) => _n(p.lord)).join('/')} → ${s == 0 ? tr('no activation', 'सक्रियता नहीं') : '+${s.toStringAsFixed(1)}'}');
       }
       out.add(RectificationCandidate(m, c, score, details));
     }

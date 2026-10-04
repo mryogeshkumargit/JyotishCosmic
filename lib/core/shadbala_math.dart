@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'calc_config.dart';
 import 'ephemeris.dart';
+import 'l10n.dart';
 import 'planetary_dignity.dart';
 import 'precision_math.dart';
 import 'vedic_math.dart';
@@ -9,7 +10,17 @@ import 'yogas_math.dart';
 
 /// One component of a planet's strength, in virupas (1 rupa = 60 virupas).
 class BalaComponent {
+  /// Sanskrit name (stable key, e.g. 'Uchcha').
   final String name;
+
+  static const Map<String, String> _hindi = {
+    'Uchcha': 'उच्च', 'Saptavargaja': 'सप्तवर्गज', 'Ojayugma': 'ओजयुग्म', 'Kendradi': 'केन्द्रादि', 'Drekkana': 'द्रेष्काण',
+    'Nathonnata': 'नतोन्नत', 'Paksha': 'पक्ष', 'Tribhaga': 'त्रिभाग', 'Abda': 'अब्द', 'Masa': 'मास', 'Vara': 'वार', 'Hora': 'होरा',
+    'Ayana': 'अयन', 'Yuddha': 'युद्ध',
+  };
+
+  /// Name in the app language.
+  String get label => L10n.hi ? (_hindi[name] ?? name) : name;
   final double value;
   final String rule;
   const BalaComponent(this.name, this.value, this.rule);
@@ -46,7 +57,7 @@ class Shadbala {
   double get minimumVirupas => ShadbalaMath.minimumVirupas[planet]!;
   double get ratio => total / minimumVirupas;
   bool get meetsMinimum => total >= minimumVirupas;
-  String get name => VedicMath.planets[planet]!.name;
+  String get name => L10n.planet(planet);
 
   /// The six components, in order.
   Map<String, double> get six => {
@@ -149,7 +160,7 @@ class ShadbalaMath {
     final sunsetAfterSunrise = sunriseBefore == null ? null : Ephemeris.nextSunset(sunriseBefore, c.lat, c.lon);
     final nextSunrise = Ephemeris.nextSunrise(c.jd, c.lat, c.lon);
     final bool dayBirth = sunsetAfterSunrise != null ? c.jd < sunsetAfterSunrise : VedicMath.norm360(asc - l['sun']!) < 180;
-    if (sunriseBefore == null) notes.add('Sunrise not defined at this latitude on the birth date; day/night taken from the Sun\'s position.');
+    if (sunriseBefore == null) notes.add(tr('Sunrise not defined at this latitude on the birth date; day/night taken from the Sun\'s position.', 'इस अक्षांश पर जन्म तिथि को सूर्योदय परिभाषित नहीं; दिन/रात सूर्य की स्थिति से लिया गया।'));
 
     // Nearest apparent noon.
     final t1 = Ephemeris.nextSunTransit(c.jd - 1, c.lat, c.lon);
@@ -289,21 +300,21 @@ class ShadbalaMath {
       drik /= 4;
 
       final sthana = [
-        BalaComponent('Uchcha', uchcha, 'Arc from the debilitation point ÷ 3'),
-        BalaComponent('Saptavargaja', sapta, 'D1, D2, D3, D7, D9, D12, D30: Moolatrikona 45, own 30, great friend 20, friend 15, neutral 10, enemy 4, great enemy 2'),
-        BalaComponent('Ojayugma', oja, feminine ? 'Moon/Venus: 15 each for an even sign in D1 and D9' : '15 each for an odd sign in D1 and D9'),
-        BalaComponent('Kendradi', kendradi, 'Kendra 60, Panaphara 30, Apoklima 15'),
-        BalaComponent('Drekkana', drekBala, 'Male planets 1st, neutral 2nd, female 3rd drekkana: 15'),
+        BalaComponent('Uchcha', uchcha, tr('Arc from the debilitation point ÷ 3', 'नीच बिंदु से दूरी ÷ 3')),
+        BalaComponent('Saptavargaja', sapta, tr('D1, D2, D3, D7, D9, D12, D30: Moolatrikona 45, own 30, great friend 20, friend 15, neutral 10, enemy 4, great enemy 2', 'D1, D2, D3, D7, D9, D12, D30: मूलत्रिकोण 45, स्वराशि 30, अधिमित्र 20, मित्र 15, सम 10, शत्रु 4, अधिशत्रु 2')),
+        BalaComponent('Ojayugma', oja, feminine ? tr('Moon/Venus: 15 each for an even sign in D1 and D9', 'चन्द्र/शुक्र: D1 और D9 में सम राशि के लिए 15-15') : tr('15 each for an odd sign in D1 and D9', 'D1 और D9 में विषम राशि के लिए 15-15')),
+        BalaComponent('Kendradi', kendradi, tr('Kendra 60, Panaphara 30, Apoklima 15', 'केन्द्र 60, पणफर 30, आपोक्लिम 15')),
+        BalaComponent('Drekkana', drekBala, tr('Male planets 1st, neutral 2nd, female 3rd drekkana: 15', 'पुरुष ग्रह पहले, नपुंसक दूसरे, स्त्री ग्रह तीसरे द्रेष्काण में: 15')),
       ];
       final kala = [
-        BalaComponent('Nathonnata', nathonnata, p == 'mercury' ? 'Mercury always 60' : 'Day/night strength from the distance to apparent noon'),
-        BalaComponent('Paksha', paksha, p == 'moon' ? 'Moon: elongation from the Sun ÷ 3, doubled' : 'Benefics: elongation ÷ 3; malefics: 60 minus that'),
-        BalaComponent('Tribhaga', tribhaga, 'Lord of the third of the day/night (Jupiter always 60)'),
-        BalaComponent('Abda', abda, 'Lord of the year (15)'),
-        BalaComponent('Masa', masa, 'Lord of the month (30)'),
-        BalaComponent('Vara', vara, 'Lord of the weekday (45)'),
-        BalaComponent('Hora', hora, 'Lord of the planetary hour (60)'),
-        BalaComponent('Ayana', ayanaKala, p == 'sun' ? 'From declination; doubled for the Sun' : 'From declination (kranti)'),
+        BalaComponent('Nathonnata', nathonnata, p == 'mercury' ? tr('Mercury always 60', 'बुध सदा 60') : tr('Day/night strength from the distance to apparent noon', 'मध्याह्न से दूरी के अनुसार दिन/रात का बल')),
+        BalaComponent('Paksha', paksha, p == 'moon' ? tr('Moon: elongation from the Sun ÷ 3, doubled', 'चन्द्र: सूर्य से दूरी ÷ 3, दोगुना') : tr('Benefics: elongation ÷ 3; malefics: 60 minus that', 'शुभ ग्रह: दूरी ÷ 3; पाप ग्रह: 60 में से वह घटाकर')),
+        BalaComponent('Tribhaga', tribhaga, tr('Lord of the third of the day/night (Jupiter always 60)', 'दिन/रात के तिहाई भाग का स्वामी (गुरु सदा 60)')),
+        BalaComponent('Abda', abda, tr('Lord of the year (15)', 'वर्ष का स्वामी (15)')),
+        BalaComponent('Masa', masa, tr('Lord of the month (30)', 'मास का स्वामी (30)')),
+        BalaComponent('Vara', vara, tr('Lord of the weekday (45)', 'वार का स्वामी (45)')),
+        BalaComponent('Hora', hora, tr('Lord of the planetary hour (60)', 'होरा का स्वामी (60)')),
+        BalaComponent('Ayana', ayanaKala, p == 'sun' ? tr('From declination; doubled for the Sun', 'क्रांति से; सूर्य के लिए दोगुना') : tr('From declination (kranti)', 'क्रांति से')),
       ];
       final ishta = math.sqrt(uchcha * cheshta.clamp(0, 60));
       final kashta = math.sqrt((60 - uchcha) * (60 - cheshta.clamp(0, 60)));
@@ -333,7 +344,7 @@ class ShadbalaMath {
         result[p] = Shadbala(
           planet: p,
           sthana: s.sthana,
-          kala: [...s.kala, BalaComponent('Yuddha', sign * diff, 'Planetary war with ${VedicMath.planets[p == winner ? loser : winner]!.name}')],
+          kala: [...s.kala, BalaComponent('Yuddha', sign * diff, tr('Planetary war with ${VedicMath.planets[p == winner ? loser : winner]!.name}', '${L10n.planet(p == winner ? loser : winner)} से ग्रह युद्ध'))],
           dig: s.dig,
           cheshta: s.cheshta,
           naisargika: s.naisargika,
@@ -342,13 +353,13 @@ class ShadbalaMath {
           kashtaPhala: s.kashtaPhala,
         );
       }
-      notes.add('Planetary war: ${VedicMath.planets[winner]!.name} defeats ${VedicMath.planets[loser]!.name} (${cfg.warRuleLabel}).');
+      notes.add(tr('Planetary war: ${VedicMath.planets[winner]!.name} defeats ${VedicMath.planets[loser]!.name} (${cfg.warRuleLabel}).', 'ग्रह युद्ध: ${L10n.planet(winner)} ने ${L10n.planet(loser)} को हराया (${cfg.warRuleLabel})।'));
     }
 
     notes.addAll([
-      'Cheshta Bala uses true heliocentric and geocentric positions in place of the classical mean planets.',
-      'Abda and Masa lords are counted in civil days from the Kali Yuga epoch (a Friday).',
-      'Vara $varaLord, Hora $horaLord, Abda $abdaLord, Masa $masaLord, ${dayBirth ? 'day' : 'night'} birth.',
+      tr('Cheshta Bala uses true heliocentric and geocentric positions in place of the classical mean planets.', 'चेष्टा बल में शास्त्रीय मध्यम ग्रहों के स्थान पर वास्तविक सूर्यकेंद्रिक और भूकेंद्रिक स्थितियाँ ली गई हैं।'),
+      tr('Abda and Masa lords are counted in civil days from the Kali Yuga epoch (a Friday).', 'अब्द और मास स्वामी कलियुग आरंभ (शुक्रवार) से नागरिक दिनों में गिने गए हैं।'),
+      tr('Vara $varaLord, Hora $horaLord, Abda $abdaLord, Masa $masaLord, ${dayBirth ? 'day' : 'night'} birth.', 'वार ${L10n.planet(varaLord)}, होरा ${L10n.planet(horaLord)}, अब्द ${L10n.planet(abdaLord)}, मास ${L10n.planet(masaLord)}, ${dayBirth ? 'दिन' : 'रात्रि'} जन्म।'),
     ]);
 
     // --- Bhava Bala ---

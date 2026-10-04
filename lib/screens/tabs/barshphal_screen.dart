@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/ephemeris.dart';
 import '../../core/barshphal_math.dart';
 import '../../widgets/kundli_chart.dart';
+import '../../core/l10n.dart';
 
 class BarshphalScreen extends StatefulWidget {
   final ChartData chartData;
@@ -34,7 +35,7 @@ class _BarshphalScreenState extends State<BarshphalScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Varshaphal')),
+      appBar: AppBar(title: Text(tr('Varshaphal', 'वर्षफल'))),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -45,7 +46,7 @@ class _BarshphalScreenState extends State<BarshphalScreen> {
                 padding: const EdgeInsets.all(24),
                 child: Column(
                   children: [
-                    const Text('Annual chart for completed age', style: TextStyle(color: Colors.grey)),
+                    Text(tr('Annual chart for completed age', 'पूर्ण आयु का वार्षिक चार्ट'), style: const TextStyle(color: Colors.grey)),
                     const SizedBox(height: 8),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -56,7 +57,7 @@ class _BarshphalScreenState extends State<BarshphalScreen> {
                       ],
                     ),
                     const SizedBox(height: 16),
-                    const Text('Varsha Pravesh (sidereal solar return, birth place time)'),
+                    Text(tr('Varsha Pravesh (sidereal solar return, birth place time)', 'वर्ष प्रवेश (निरयन सूर्य वापसी, जन्म स्थान का समय)'), textAlign: TextAlign.center),
                     Text(data.solarReturnDate, style: const TextStyle(fontWeight: FontWeight.bold)),
                   ],
                 ),
@@ -64,22 +65,22 @@ class _BarshphalScreenState extends State<BarshphalScreen> {
             ),
             const SizedBox(height: 24),
             _buildDetailCard(
-              'Muntha',
-              '${data.munthaRashiData.name} (${data.munthaRashiData.hindi})',
-              'Lord: ${data.munthaLord.name}',
+              tr('Muntha', 'मुंथा'),
+              L10n.hi ? data.munthaRashiData.hindi : '${data.munthaRashiData.name} (${data.munthaRashiData.hindi})',
+              '${tr('Lord', 'स्वामी')}: ${L10n.hi ? data.munthaLord.hindi : data.munthaLord.name}',
               data.munthaLord.color,
             ),
             const SizedBox(height: 16),
             _buildDetailCard(
-              'Varsha Lagna (Year Ascendant)',
-              '${data.yearLagnaData.name} (${data.yearLagnaData.hindi})',
-              'Lagna lord: ${data.yearLagnaLord.name}',
+              tr('Varsha Lagna (Year Ascendant)', 'वर्ष लग्न'),
+              L10n.hi ? data.yearLagnaData.hindi : '${data.yearLagnaData.name} (${data.yearLagnaData.hindi})',
+              '${tr('Lagna lord', 'लग्नेश')}: ${L10n.hi ? data.yearLagnaLord.hindi : data.yearLagnaLord.name}',
               data.yearLagnaLord.color,
             ),
             const SizedBox(height: 24),
-            const Text('Annual Chart (Varshfal)', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+            Text(tr('Annual Chart (Varshfal)', 'वार्षिक कुंडली (वर्षफल)'), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
             const SizedBox(height: 16),
-            SizedBox(height: 350, child: _buildVarshfalChart()),
+            _buildVarshfalChart(),
           ],
         ),
       ),
@@ -91,6 +92,7 @@ class _BarshphalScreenState extends State<BarshphalScreen> {
     return KundliChart(
       housePlanets: chartLabels(chart),
       ascendantSign: chart.lagnaRashi + 1,
+      showLegend: true,
       onHouseTapped: (house) {},
     );
   }

@@ -1,3 +1,5 @@
+import 'l10n.dart';
+
 /// Rule and source registries (Master Knowledge Base v1.0.0; Volume 6 §18-20,
 /// §58-59, §104-105).
 ///
@@ -148,6 +150,18 @@ class KnowledgeRegistry {
   ];
 
   static KnowledgeRule rule(String id) => rules.firstWhere((r) => r.id == id);
+
+  static const Map<String, String> _ruleNamesHi = {
+    'R001': 'भावेश श्रृंखला', 'R002': 'युति जोड़ा संश्लेषण', 'R003': 'बहु-ग्रह संश्लेषण', 'R004': 'दशा सक्रियता', 'R005': 'गोचर पुष्टि',
+    'R006': 'अष्टकवर्ग पुष्टि', 'R007': 'वर्ग पुष्टि', 'R008': 'अंश-संवेदनशील युति', 'R009': 'अस्त संशोधक', 'R010': 'ग्रह युद्ध संशोधक',
+    'R011': 'गरिमा संशोधक', 'R012': 'कार्यात्मक स्वामित्व', 'R013': 'प्रमाण पृथक्करण', 'R014': 'भविष्यवाणी निर्भरता', 'R015': 'विरोध समाधान',
+    'R016': 'नामित योग और भंग', 'R017': 'षड्बल', 'R018': 'भाव बल', 'R019': 'चर कारक', 'R020': 'आरूढ़ और उपपद', 'R021': 'अंश-सटीक गोचर',
+    'R022': 'समय-सीमा प्रतिच्छेद', 'R023': 'जन्म-समय संवेदनशीलता', 'R024': 'वर्ग में युति की पुनरावृत्ति', 'R025': 'भाव-संधि',
+    'R026': 'कारक स्थिति', 'R027': 'सीधा बहु-ग्रह नियम', 'R028': 'उपचय में पाप ग्रह', 'R029': 'भाव में ग्रह और दृष्टि', 'R030': 'महादशा-अंतर्दशा संबंध',
+  };
+
+  /// Rule name in the app language.
+  static String ruleName(String id) => L10n.hi ? (_ruleNamesHi[id] ?? rule(id).name) : rule(id).name;
   static KnowledgeSource source(String id) => sources.firstWhere((s) => s.id == id);
 
   static String sourceLabel(String id) {

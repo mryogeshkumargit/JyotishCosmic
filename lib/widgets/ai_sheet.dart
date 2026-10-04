@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/profile_provider.dart';
 import '../providers/settings_provider.dart';
 import '../services/ai_service.dart';
+import '../core/l10n.dart';
 
 /// Renders AI output (Markdown) with selectable text.
 class AiMarkdown extends StatelessWidget {
@@ -88,9 +89,9 @@ class _AiSheetState extends ConsumerState<_AiSheet> {
     try {
       await ref.read(profileNotifierProvider.notifier).saveInterpretation(widget.profileId!, '# ${widget.title}\n\n$text');
       setState(() => _saved = true);
-      messenger.showSnackBar(const SnackBar(content: Text('Interpretation saved')));
+      messenger.showSnackBar(SnackBar(content: Text(tr('Interpretation saved', 'विश्लेषण सहेजा गया'))));
     } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text('Error saving: $e')));
+      messenger.showSnackBar(SnackBar(content: Text('${tr('Error saving', 'सहेजने में त्रुटि')}: $e')));
     }
   }
 
@@ -132,7 +133,7 @@ class _AiSheetState extends ConsumerState<_AiSheet> {
             const SizedBox(height: 12),
             Text(_error!, style: TextStyle(color: scheme.error), textAlign: TextAlign.center),
             const SizedBox(height: 16),
-            OutlinedButton(onPressed: _start, child: const Text('Retry')),
+            OutlinedButton(onPressed: _start, child: Text(tr('Retry', 'फिर से प्रयास करें'))),
           ],
         ),
       );
@@ -144,7 +145,7 @@ class _AiSheetState extends ConsumerState<_AiSheet> {
           children: [
             CircularProgressIndicator(color: scheme.secondary),
             const SizedBox(height: 16),
-            Text('Waiting for the AI… reasoning models can take a minute before they start writing.',
+            Text(tr('Waiting for the AI… reasoning models can take a minute before they start writing.', 'AI की प्रतीक्षा… तर्क करने वाले मॉडल लिखना शुरू करने में एक मिनट ले सकते हैं।'),
                 textAlign: TextAlign.center, style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13)),
           ],
         ),
@@ -158,14 +159,14 @@ class _AiSheetState extends ConsumerState<_AiSheet> {
           if (_error != null) ...[
             const SizedBox(height: 12),
             Text(_error!, style: TextStyle(color: scheme.error)),
-            TextButton(onPressed: _start, child: const Text('Retry')),
+            TextButton(onPressed: _start, child: Text(tr('Retry', 'फिर से प्रयास करें'))),
           ],
           if (_done && _error == null && widget.profileId != null) ...[
             const SizedBox(height: 20),
             ElevatedButton.icon(
               onPressed: _saved ? null : () => _save(_text),
               icon: Icon(_saved ? Icons.check : Icons.save),
-              label: Text(_saved ? 'Saved' : 'Save Interpretation to Profile'),
+              label: Text(_saved ? tr('Saved', 'सहेजा गया') : tr('Save Interpretation to Profile', 'विश्लेषण प्रोफ़ाइल में सहेजें')),
             ),
           ],
           const SizedBox(height: 24),

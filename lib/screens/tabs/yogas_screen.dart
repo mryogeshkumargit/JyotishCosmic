@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/chart_summary.dart';
 import '../../core/ephemeris.dart';
-import '../../core/vedic_math.dart';
+import '../../core/l10n.dart';
+import '../../core/plain/interpret.dart';
+import '../../core/plain/yoga_meanings.dart';
 import '../../core/yogas_math.dart';
+import '../../widgets/analysis_widgets.dart';
 import '../../widgets/ai_sheet.dart';
 import '../../widgets/yoga_guide_view.dart';
 
@@ -22,7 +25,17 @@ class YogasScreen extends ConsumerStatefulWidget {
 }
 
 class _YogasScreenState extends ConsumerState<YogasScreen> {
-  late final List<YogaResult> _all = YogasMath.forChart(widget.chartData, gender: widget.gender);
+  String? _lang;
+  late List<YogaResult> _cache;
+
+  /// Recomputed when the app language changes (reasons and rules are bilingual).
+  List<YogaResult> get _all {
+    if (_lang != L10n.lang) {
+      _lang = L10n.lang;
+      _cache = YogasMath.forChart(widget.chartData, gender: widget.gender);
+    }
+    return _cache;
+  }
 
   List<YogaResult> get _formed => _all.where((y) => y.formed).toList();
 
@@ -37,7 +50,7 @@ class _YogasScreenState extends ConsumerState<YogasScreen> {
         'Do not treat the number of yogas as a measure of the chart; synthesise them.\n\n'
         'Yogas found (calculated by the app with classical rules):\n$list\n\n'
         'Chart:\n${ChartSummary.describe(widget.chartData, name: widget.name)}';
-    showAiSheet(context, ref, title: 'Yoga Interpretation', prompt: prompt, profileId: widget.profileId);
+    showAiSheet(context, ref, title: tr('Yoga Interpretation', 'योग विश्लेषण'), prompt: prompt, profileId: widget.profileId);
   }
 
   @override
@@ -47,12 +60,12 @@ class _YogasScreenState extends ConsumerState<YogasScreen> {
       length: 3,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Yogas'),
+          title: Text(tr('Yogas', 'योग')),
           bottom: TabBar(
             tabs: [
-              Tab(text: 'Found (${formed.length})'),
-              const Tab(text: 'Checked'),
-              const Tab(text: 'Guide'),
+              Tab(text: tr('Found (${formed.length})', 'बने (${formed.length})')),
+              Tab(text: tr('Checked', 'जाँचे गए')),
+              Tab(text: tr('Guide', 'मार्गदर्शिका')),
             ],
           ),
         ),
@@ -101,15 +114,15 @@ class _FormedList extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('${yogas.length} yogas form in this chart',
+                Text(tr('${yogas.length} yogas form in this chart', 'इस कुंडली में ${yogas.length} योग बनते हैं'),
                     style: TextStyle(color: scheme.secondary, fontSize: 17, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 6),
-                Text('$favourable favourable • $adverse challenging • ${yogas.length - favourable - adverse} mixed'
-                    '${active > 0 ? '\n$active involve the planets of your current Dasha' : ''}'),
+                Text(tr('$favourable favourable • $adverse challenging • ${yogas.length - favourable - adverse} mixed', '$favourable शुभ • $adverse चुनौतीपूर्ण • ${yogas.length - favourable - adverse} मिश्रित')
+                    + (active > 0 ? tr('\n$active involve the planets of your current Dasha', '\n$active में आपकी वर्तमान दशा के ग्रह शामिल हैं') : '')),
                 const SizedBox(height: 8),
+                SimpleMeaningCard([Interpret.yogaSummary(yogas)], card: false),
                 Text(
-                  'A yoga is a potential, not a guaranteed event. Its results depend on the strength of the planets, '
-                  'cancellations, and the Dasha and transits that activate it. Tap a yoga to see the exact rule and how it forms here.',
+                  tr('Tap a yoga to see what it means for you, the exact rule and how it forms here.', 'किसी योग पर टैप करें: आपके लिए उसका अर्थ, सटीक नियम और यहाँ वह कैसे बना।'),
                   style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12),
                 ),
                 const SizedBox(height: 8),
@@ -118,7 +131,7 @@ class _FormedList extends StatelessWidget {
                   child: OutlinedButton.icon(
                     onPressed: onAskAi,
                     icon: const Icon(Icons.auto_awesome),
-                    label: const Text('Ask AI to interpret my yogas'),
+                    label: Text(tr('Ask AI to interpret my yogas', 'AI से मेरे योगों का विश्लेषण कराएँ')),
                   ),
                 ),
               ],
@@ -147,8 +160,8 @@ class _CheckedList extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
           child: Text(
-            'Every yoga the app checks, with its formation rule and source. ${yogas.length} checks, '
-            '${yogas.where((y) => y.formed).length} formed.',
+            tr('Every yoga the app checks, with its formation rule and source. ${yogas.length} checks, ${yogas.where((y) => y.formed).length} formed.',
+                'ऐप द्वारा जाँचे गए सभी योग, उनके नियम और स्रोत के साथ। ${yogas.length} जाँच, ${yogas.where((y) => y.formed).length} बने।'),
             style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12),
           ),
         ),
@@ -173,7 +186,7 @@ class _FamilyHeader extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(4, 16, 4, 6),
       child: Text(
-        total == null ? '$family ($count)' : '$family ($count of $total formed)',
+        total == null ? '${YogaMeanings.family(family)} ($count)' : tr('$family ($count of $total formed)', '${YogaMeanings.family(family)} ($total में से $count बने)'),
         style: TextStyle(color: scheme.primary, fontSize: 15, fontWeight: FontWeight.bold),
       ),
     );
@@ -209,30 +222,31 @@ class _YogaCard extends StatelessWidget {
             y.formed ? (y.nature == YogaNature.adverse ? Icons.warning_amber_rounded : Icons.check_circle) : Icons.radio_button_unchecked,
             color: color,
           ),
-          title: Text(y.name, style: TextStyle(fontWeight: FontWeight.bold, color: y.formed ? scheme.onSurface : scheme.onSurfaceVariant)),
+          title: Text(L10n.hi ? y.hindi : y.name, style: TextStyle(fontWeight: FontWeight.bold, color: y.formed ? scheme.onSurface : scheme.onSurfaceVariant)),
           subtitle: Padding(
             padding: const EdgeInsets.only(top: 4),
             child: Wrap(
               spacing: 6,
               runSpacing: 4,
               children: [
-                _Tag(y.strength, color),
-                if (y.active) _Tag('Active in Dasha', scheme.primary),
+                _Tag(Interpret.yogaStrength(y.strength), color),
+                if (y.active) _Tag(tr('Active in Dasha', 'दशा में सक्रिय'), scheme.primary),
                 if (y.planets.isNotEmpty && y.formed && y.planets.length <= 4)
-                  Text(y.planets.map((p) => VedicMath.planets[p]?.name ?? p).join(', '),
+                  Text(y.planets.map(L10n.planet).join(', '),
                       style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
               ],
             ),
           ),
           children: [
-            if (y.hindi.isNotEmpty) Text(y.hindi, style: TextStyle(color: scheme.secondary)),
+            Text(L10n.hi ? y.name : y.hindi, style: TextStyle(color: scheme.secondary)),
             const SizedBox(height: 6),
-            Text(y.description, style: const TextStyle(height: 1.4)),
-            _Section('In this chart', y.reasons),
-            if (y.modifiers.isNotEmpty) _Section('Strength factors', y.modifiers),
-            _Section('Rule', [y.rule]),
+            SimpleMeaningCard([Interpret.yoga(y)], card: false),
+            if (!L10n.hi) _Section('Classical results', [y.description]),
+            _Section(tr('In this chart', 'इस कुंडली में'), y.reasons),
+            if (y.modifiers.isNotEmpty) _Section(tr('Strength factors', 'बल के कारक'), y.modifiers),
+            _Section(tr('Rule', 'नियम'), [y.rule]),
             const SizedBox(height: 4),
-            Text('Source: ${y.source}', style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant, fontStyle: FontStyle.italic)),
+            Text('${tr('Source', 'स्रोत')}: ${y.source}', style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant, fontStyle: FontStyle.italic)),
           ],
         ),
       ),

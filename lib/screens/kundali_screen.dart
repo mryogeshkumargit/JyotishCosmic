@@ -8,6 +8,7 @@ import 'package:drift/drift.dart' show Value;
 import '../core/database.dart';
 import '../core/profile_chart.dart';
 import '../services/location_service.dart';
+import '../core/l10n.dart';
 
 class KundaliScreen extends StatelessWidget {
   final int initialTab;
@@ -20,14 +21,14 @@ class KundaliScreen extends StatelessWidget {
       initialIndex: initialTab,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Kundali'),
+          title: Text(tr('Kundali', 'कुंडली')),
           bottom: TabBar(
             indicatorColor: Theme.of(context).colorScheme.secondary,
             labelColor: Theme.of(context).colorScheme.secondary,
             unselectedLabelColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-            tabs: const [
-              Tab(text: 'Open Kundali'),
-              Tab(text: 'New Kundali'),
+            tabs: [
+              Tab(text: tr('Open Kundali', 'कुंडली खोलें')),
+              Tab(text: tr('New Kundali', 'नई कुंडली')),
             ],
           ),
         ),
@@ -157,13 +158,13 @@ class _NewKundaliTabState extends ConsumerState<_NewKundaliTab> {
     final tz = double.tryParse(_tzController.text.trim());
     String? error;
     if (_nameController.text.trim().isEmpty) {
-      error = 'Please enter a name';
+      error = tr('Please enter a name', 'कृपया नाम लिखें');
     } else if (_selectedDate == null || _selectedTime == null) {
-      error = 'Please select the date and time of birth';
+      error = tr('Please select the date and time of birth', 'कृपया जन्म तिथि और समय चुनें');
     } else if (lat == null || lon == null || lat.abs() > 90 || lon.abs() > 180) {
-      error = 'Please choose a city or enter valid coordinates';
+      error = tr('Please choose a city or enter valid coordinates', 'कृपया शहर चुनें या सही अक्षांश-देशांतर लिखें');
     } else if (tz == null || tz < -14 || tz > 14) {
-      error = 'Please enter a valid UTC offset (e.g. 5.5 for IST)';
+      error = tr('Please enter a valid UTC offset (e.g. 5.5 for IST)', 'कृपया सही UTC अंतर लिखें (जैसे IST के लिए 5.5)');
     }
     if (error != null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
@@ -205,7 +206,7 @@ class _NewKundaliTabState extends ConsumerState<_NewKundaliTab> {
         );
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not save profile: $e')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${tr('Could not save profile', 'प्रोफ़ाइल सहेजी नहीं जा सकी')}: $e')));
       return;
     }
 
@@ -252,7 +253,7 @@ class _NewKundaliTabState extends ConsumerState<_NewKundaliTab> {
             Row(
               children: [
                 Expanded(
-                  child: Text('Editing Profile',
+                  child: Text(tr('Editing Profile', 'प्रोफ़ाइल संपादन'),
                       style: TextStyle(color: scheme.secondary, fontSize: 18, fontWeight: FontWeight.bold)),
                 ),
                 TextButton(
@@ -260,7 +261,7 @@ class _NewKundaliTabState extends ConsumerState<_NewKundaliTab> {
                     ref.read(editProfileProvider.notifier).setProfile(null);
                     setState(_clear);
                   },
-                  child: const Text('Cancel Edit', style: TextStyle(color: Colors.red)),
+                  child: Text(tr('Cancel Edit', 'संपादन रद्द करें'), style: const TextStyle(color: Colors.red)),
                 )
               ],
             ),
@@ -268,17 +269,17 @@ class _NewKundaliTabState extends ConsumerState<_NewKundaliTab> {
           ],
           TextField(
             controller: _nameController,
-            decoration: InputDecoration(labelText: 'Name', prefixIcon: Icon(Icons.person, color: scheme.secondary)),
+            decoration: InputDecoration(labelText: tr('Name', 'नाम'), prefixIcon: Icon(Icons.person, color: scheme.secondary)),
           ),
           const SizedBox(height: 16),
           Row(
             children: [
               Expanded(
                 child: _buildPickerCard(
-                  'Date of Birth',
+                  tr('Date of Birth', 'जन्म तिथि'),
                   _selectedDate != null
                       ? '${_selectedDate!.year}-${_selectedDate!.month.toString().padLeft(2, '0')}-${_selectedDate!.day.toString().padLeft(2, '0')}'
-                      : 'Select Date',
+                      : tr('Select Date', 'तिथि चुनें'),
                   Icons.calendar_today,
                   _pickDate,
                 ),
@@ -286,10 +287,10 @@ class _NewKundaliTabState extends ConsumerState<_NewKundaliTab> {
               const SizedBox(width: 16),
               Expanded(
                 child: _buildPickerCard(
-                  'Time of Birth',
+                  tr('Time of Birth', 'जन्म समय'),
                   _selectedTime != null
                       ? '${_selectedTime!.hour.toString().padLeft(2, '0')}:${_selectedTime!.minute.toString().padLeft(2, '0')}'
-                      : 'Select Time',
+                      : tr('Select Time', 'समय चुनें'),
                   Icons.access_time,
                   _pickTime,
                 ),
@@ -317,7 +318,7 @@ class _NewKundaliTabState extends ConsumerState<_NewKundaliTab> {
               Expanded(
                 child: TextField(
                   controller: _latController,
-                  decoration: const InputDecoration(labelText: 'Latitude', hintText: 'N +, S -'),
+                  decoration: InputDecoration(labelText: tr('Latitude', 'अक्षांश'), hintText: tr('N +, S -', 'उत्तर +, दक्षिण -')),
                   keyboardType: const TextInputType.numberWithOptions(signed: true, decimal: true),
                 ),
               ),
@@ -325,7 +326,7 @@ class _NewKundaliTabState extends ConsumerState<_NewKundaliTab> {
               Expanded(
                 child: TextField(
                   controller: _lonController,
-                  decoration: const InputDecoration(labelText: 'Longitude', hintText: 'E +, W -'),
+                  decoration: InputDecoration(labelText: tr('Longitude', 'देशांतर'), hintText: tr('E +, W -', 'पूर्व +, पश्चिम -')),
                   keyboardType: const TextInputType.numberWithOptions(signed: true, decimal: true),
                 ),
               ),
@@ -335,28 +336,28 @@ class _NewKundaliTabState extends ConsumerState<_NewKundaliTab> {
           TextField(
             controller: _tzController,
             decoration: InputDecoration(
-              labelText: 'UTC Offset at birth (hours)',
-              hintText: 'e.g. 5.5 for IST',
+              labelText: tr('UTC Offset at birth (hours)', 'जन्म के समय UTC अंतर (घंटे)'),
+              hintText: tr('e.g. 5.5 for IST', 'जैसे IST के लिए 5.5'),
               helperMaxLines: 3,
               helperText: _tzName != null && !_tzEditedManually
-                  ? 'Calculated from $_tzName (includes daylight saving)'
-                  : 'Enter the offset in force at the time of birth',
+                  ? tr('Calculated from $_tzName (includes daylight saving)', '$_tzName से गणना (डेलाइट सेविंग सहित)')
+                  : tr('Enter the offset in force at the time of birth', 'जन्म के समय लागू अंतर लिखें'),
             ),
             keyboardType: const TextInputType.numberWithOptions(signed: true, decimal: true),
             onChanged: (_) => _tzEditedManually = true,
           ),
           const SizedBox(height: 24),
-          Text('Gender', style: TextStyle(color: scheme.onSurface, fontSize: 16)),
+          Text(tr('Gender', 'लिंग'), style: TextStyle(color: scheme.onSurface, fontSize: 16)),
           RadioGroup<String>(
             groupValue: _gender,
             onChanged: (val) => setState(() => _gender = val!),
-            child: const Row(
+            child: Row(
               children: [
-                Radio<String>(value: 'Male'),
-                Text('Male'),
-                SizedBox(width: 24),
-                Radio<String>(value: 'Female'),
-                Text('Female'),
+                const Radio<String>(value: 'Male'),
+                Text(tr('Male', 'पुरुष')),
+                const SizedBox(width: 24),
+                const Radio<String>(value: 'Female'),
+                Text(tr('Female', 'स्त्री')),
               ],
             ),
           ),
@@ -369,7 +370,7 @@ class _NewKundaliTabState extends ConsumerState<_NewKundaliTab> {
                   activeColor: scheme.secondary,
                   onChanged: (val) => setState(() => _saveProfile = val!),
                 ),
-                const Text('Save this profile on this device'),
+                Expanded(child: Text(tr('Save this profile on this device', 'यह प्रोफ़ाइल इस डिवाइस पर सहेजें'))),
               ],
             ),
           ],
@@ -384,7 +385,7 @@ class _NewKundaliTabState extends ConsumerState<_NewKundaliTab> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
               onPressed: _submit,
-              child: Text(isEditing ? 'Update Horoscope' : 'Get Horoscope',
+              child: Text(isEditing ? tr('Update Horoscope', 'कुंडली अपडेट करें') : tr('Get Horoscope', 'कुंडली बनाएँ'),
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             ),
           )
@@ -410,7 +411,7 @@ class _NewKundaliTabState extends ConsumerState<_NewKundaliTab> {
               children: [
                 Icon(icon, color: scheme.secondary, size: 18),
                 const SizedBox(width: 8),
-                Text(value, style: TextStyle(color: scheme.onSurface, fontSize: 14)),
+                Flexible(child: Text(value, style: TextStyle(color: scheme.onSurface, fontSize: 14))),
               ],
             )
           ],

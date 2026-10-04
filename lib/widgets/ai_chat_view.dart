@@ -4,21 +4,22 @@ import '../providers/profile_provider.dart';
 import '../providers/settings_provider.dart';
 import '../services/ai_service.dart';
 import 'ai_sheet.dart';
+import '../core/l10n.dart';
 
 /// Multi-turn chat with the configured AI. [chartContext] (if any) is sent
 /// with the first question so the model can refer back to it later.
 class AiChatView extends ConsumerStatefulWidget {
   final String? chartContext;
   final int? profileId;
-  final String greeting;
-  final String hint;
+  final String? greeting;
+  final String? hint;
 
   const AiChatView({
     super.key,
     this.chartContext,
     this.profileId,
-    this.greeting = 'Namaste. I am your cosmic guide. Ask me anything about this Kundali.',
-    this.hint = 'Ask about career, marriage, dasha...',
+    this.greeting,
+    this.hint,
   });
 
   @override
@@ -97,16 +98,16 @@ class _AiChatViewState extends ConsumerState<AiChatView> {
     final messenger = ScaffoldMessenger.of(context);
     try {
       await ref.read(profileNotifierProvider.notifier).saveInterpretation(widget.profileId!, text);
-      messenger.showSnackBar(const SnackBar(content: Text('Interpretation saved')));
+      messenger.showSnackBar(SnackBar(content: Text(tr('Interpretation saved', 'विश्लेषण सहेजा गया'))));
     } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text('Error saving: $e')));
+      messenger.showSnackBar(SnackBar(content: Text('${tr('Error saving', 'सहेजने में त्रुटि')}: $e')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final items = [(false, widget.greeting, false), ..._display, if (_streaming.isNotEmpty) (false, _streaming, false)];
+    final items = [(false, widget.greeting ?? tr('Namaste. I am your cosmic guide. Ask me anything about this Kundali.', 'नमस्ते। मैं आपका ज्योतिष मार्गदर्शक हूँ। इस कुंडली के बारे में कुछ भी पूछें।'), false), ..._display, if (_streaming.isNotEmpty) (false, _streaming, false)];
     return Column(
       children: [
         Expanded(
@@ -140,7 +141,7 @@ class _AiChatViewState extends ConsumerState<AiChatView> {
                         TextButton.icon(
                           onPressed: () => _save(text),
                           icon: const Icon(Icons.save, size: 16),
-                          label: const Text('Save Interpretation', style: TextStyle(fontSize: 12)),
+                          label: Text(tr('Save Interpretation', 'विश्लेषण सहेजें'), style: const TextStyle(fontSize: 12)),
                         ),
                     ],
                   ),
@@ -164,7 +165,7 @@ class _AiChatViewState extends ConsumerState<AiChatView> {
                     maxLines: 4,
                     textInputAction: TextInputAction.send,
                     decoration: InputDecoration(
-                      hintText: widget.hint,
+                      hintText: widget.hint ?? tr('Ask about career, marriage, dasha...', 'करियर, विवाह, दशा के बारे में पूछें...'),
                       border: InputBorder.none,
                       enabledBorder: InputBorder.none,
                       focusedBorder: InputBorder.none,

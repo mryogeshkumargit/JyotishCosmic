@@ -46,7 +46,7 @@ void main() {
             child: KundliChart(
               style: style,
               ascendantSign: 2, // Taurus
-              housePlanets: {for (int i = 1; i <= 12; i++) i: i == 1 ? ['Su 12°', 'Sa 3°ᴿ'] : <String>[]},
+              housePlanets: {for (int i = 1; i <= 12; i++) i: i == 1 ? const [ChartLabel('sun', degree: 12), ChartLabel('saturn', degree: 3, retrograde: true)] : <ChartLabel>[]},
               onHouseTapped: (h) => tapped = h,
             ),
           ),

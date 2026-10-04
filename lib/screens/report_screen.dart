@@ -8,6 +8,7 @@ import '../providers/settings_provider.dart';
 import '../services/ai_service.dart';
 import '../services/pdf_service.dart';
 import '../widgets/ai_sheet.dart';
+import '../core/l10n.dart';
 
 class ReportScreen extends ConsumerStatefulWidget {
   const ReportScreen({super.key});
@@ -51,9 +52,9 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
   Future<void> _exportPdf(Profile profile) async {
     setState(() => _exporting = true);
     try {
-      await PdfService().shareMarkdownReport(title: 'Vedic Life Report', name: profile.name, markdown: _resultText!);
+      await PdfService().shareMarkdownReport(title: tr('Vedic Life Report', 'वैदिक जीवन रिपोर्ट'), name: profile.name, markdown: _resultText!);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('PDF export failed: $e')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${tr('PDF export failed', 'PDF निर्यात विफल')}: $e')));
     } finally {
       if (mounted) setState(() => _exporting = false);
     }
@@ -66,7 +67,7 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
 
     return profilesAsync.when(
       loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (err, _) => Scaffold(body: Center(child: Text('Error: $err'))),
+      error: (err, _) => Scaffold(body: Center(child: Text('${tr('Error', 'त्रुटि')}: $err'))),
       data: (profiles) {
         Profile? active;
         for (final p in profiles) {
@@ -76,26 +77,26 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
 
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Premium Report'),
+            title: Text(tr('Premium Report', 'विस्तृत रिपोर्ट')),
             actions: [
               if (_resultText != null && !_isLoading && active != null)
                 IconButton(
                   icon: _exporting
                       ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
                       : const Icon(Icons.download),
-                  tooltip: 'Export PDF',
+                  tooltip: tr('Export PDF', 'PDF निर्यात'),
                   onPressed: _exporting ? null : () => _exportPdf(active!),
                 ),
             ],
           ),
           body: active == null
-              ? const Center(child: Text('Create a profile to generate a report.'))
+              ? Center(child: Text(tr('Create a profile to generate a report.', 'रिपोर्ट बनाने के लिए एक प्रोफ़ाइल बनाएँ।')))
               : ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
                     DropdownButtonFormField<int>(
                       isExpanded: true,
-                      decoration: const InputDecoration(labelText: 'Profile'),
+                      decoration: InputDecoration(labelText: tr('Profile', 'प्रोफ़ाइल')),
                       initialValue: active.id,
                       items: profiles.map((p) => DropdownMenuItem(value: p.id, child: Text(p.name))).toList(),
                       onChanged: _isLoading
@@ -110,14 +111,14 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
                     if (_resultText == null && !_isLoading) ...[
                       Icon(Icons.picture_as_pdf, size: 80, color: scheme.secondary),
                       const SizedBox(height: 24),
-                      Text('Generate a 360° comprehensive Vedic Life Report for ${active.name}.',
+                      Text(tr('Generate a 360° comprehensive Vedic Life Report for ${active.name}.', '${active.name} के लिए 360° विस्तृत वैदिक जीवन रिपोर्ट बनाएँ।'),
                           textAlign: TextAlign.center, style: const TextStyle(fontSize: 18)),
                       const SizedBox(height: 32),
                       Center(
                         child: ElevatedButton.icon(
                           onPressed: () => _generateFullReport(active!),
                           icon: const Icon(Icons.auto_awesome),
-                          label: const Text('Generate Report'),
+                          label: Text(tr('Generate Report', 'रिपोर्ट बनाएँ')),
                         ),
                       ),
                       if (_error != null) ...[
@@ -126,12 +127,12 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
                       ],
                     ],
                     if (_isLoading && _resultText == null)
-                      const Padding(
+                      Padding(
                         padding: EdgeInsets.all(48),
                         child: Column(children: [
                           CircularProgressIndicator(),
                           SizedBox(height: 16),
-                          Text('Writing your report… long reports can take a few minutes.', textAlign: TextAlign.center),
+                          Text(tr('Writing your report… long reports can take a few minutes.', 'आपकी रिपोर्ट लिखी जा रही है… लंबी रिपोर्ट में कुछ मिनट लग सकते हैं।'), textAlign: TextAlign.center),
                         ]),
                       ),
                     if (_isLoading && _resultText != null) const LinearProgressIndicator(minHeight: 2),
@@ -155,7 +156,7 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
                         child: TextButton.icon(
                           onPressed: () => _generateFullReport(active!),
                           icon: const Icon(Icons.refresh),
-                          label: const Text('Generate again'),
+                          label: Text(tr('Generate again', 'फिर से बनाएँ')),
                         ),
                       ),
                     ],

@@ -43,6 +43,9 @@ class SettingsState {
   final String chartStyle; // 'North', 'South' or 'East'
   final String themeMode; // 'Cosmic', 'Dark', 'Light'
 
+  /// App language: 'en' or 'hi'.
+  final String appLanguage;
+
   // AI Config
   final String llmProvider;
   final String aiLanguage;
@@ -59,6 +62,7 @@ class SettingsState {
   SettingsState({
     this.chartStyle = 'North',
     this.themeMode = 'Cosmic',
+    this.appLanguage = 'en',
     this.llmProvider = 'OpenAI',
     this.aiLanguage = 'English',
     this.apiEndpoint = 'https://api.openai.com/v1/chat/completions',
@@ -78,6 +82,7 @@ class SettingsState {
   SettingsState copyWith({
     String? chartStyle,
     String? themeMode,
+    String? appLanguage,
     String? llmProvider,
     String? aiLanguage,
     String? apiEndpoint,
@@ -89,6 +94,7 @@ class SettingsState {
     return SettingsState(
       chartStyle: chartStyle ?? this.chartStyle,
       themeMode: themeMode ?? this.themeMode,
+      appLanguage: appLanguage ?? this.appLanguage,
       llmProvider: llmProvider ?? this.llmProvider,
       aiLanguage: aiLanguage ?? this.aiLanguage,
       apiEndpoint: apiEndpoint ?? this.apiEndpoint,
@@ -149,6 +155,7 @@ class SettingsNotifier extends Notifier<SettingsState> {
         modelCache: cache,
         chartStyle: values['chartStyle'],
         themeMode: values['themeMode'],
+        appLanguage: values['appLanguage'] == 'hi' ? 'hi' : (values['appLanguage'] == null ? null : 'en'),
         llmProvider: provider,
         aiLanguage: values['aiLanguage'],
         apiEndpoint: endpoint,
@@ -164,6 +171,17 @@ class SettingsNotifier extends Notifier<SettingsState> {
     state = state.copyWith(chartStyle: style, themeMode: theme);
     await _storage.write(key: 'chartStyle', value: style);
     await _storage.write(key: 'themeMode', value: theme);
+  }
+
+  /// Switches the app language; the AI answer language follows unless the
+  /// user picked a different one.
+  Future<void> updateLanguage(String lang) async {
+    final follow = state.aiLanguage == 'English' || state.aiLanguage == 'Hindi';
+    state = state.copyWith(appLanguage: lang, aiLanguage: follow ? (lang == 'hi' ? 'Hindi' : 'English') : null);
+    try {
+      await _storage.write(key: 'appLanguage', value: lang);
+      if (follow) await _storage.write(key: 'aiLanguage', value: state.aiLanguage);
+    } catch (_) {}
   }
 
   Future<void> updateAIConfig(String llm, String lang, String endpoint, String key, String model) async {

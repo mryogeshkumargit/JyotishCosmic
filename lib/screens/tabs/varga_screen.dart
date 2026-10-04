@@ -4,6 +4,8 @@ import '../../core/ephemeris.dart';
 import '../../core/vedic_math.dart';
 import '../../widgets/ai_sheet.dart';
 import '../../widgets/kundli_chart.dart';
+import '../../widgets/analysis_widgets.dart';
+import '../../core/l10n.dart';
 
 class VargaScreen extends ConsumerWidget {
   final ChartData chartData;
@@ -34,14 +36,27 @@ class VargaScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Shodashvarga')),
+      appBar: AppBar(title: Text(tr('Shodashvarga', 'षोडशवर्ग'))),
       body: ListView.builder(
         padding: const EdgeInsets.all(16),
-        itemCount: VedicMath.vargaDefs.length,
-        itemBuilder: (context, index) => _buildVargaCard(context, ref, VedicMath.vargaDefs[index]),
+        itemCount: VedicMath.vargaDefs.length + 2,
+        itemBuilder: (context, index) => index == 0
+            ? Padding(padding: const EdgeInsets.only(bottom: 12), child: SimpleMeaningCard(_plain()))
+            : index == 1
+                ? const Padding(padding: EdgeInsets.only(bottom: 12), child: ChartLegend())
+                : _buildVargaCard(context, ref, VedicMath.vargaDefs[index - 2]),
       ),
     );
   }
+
+  List<String> _plain() => [
+        tr('Divisional charts (vargas) zoom into one area of life. Each one re-divides every sign into smaller parts, so the same planet can land in a different sign there.',
+            'वर्ग कुंडलियाँ जीवन के किसी एक क्षेत्र को बड़ा करके दिखाती हैं। हर राशि को छोटे भागों में बाँटा जाता है, इसलिए वही ग्रह वहाँ अलग राशि में आ सकता है।'),
+        tr('Read the D1 (birth chart) first; a varga only confirms or refines its promise. D9 (marriage, inner strength) and D10 (career) are the most used.',
+            'पहले D1 (जन्म कुंडली) देखें; वर्ग कुंडली केवल उसके वादे की पुष्टि या सूक्ष्म जानकारी देती है। D9 (विवाह, आंतरिक बल) और D10 (करियर) सबसे अधिक देखी जाती हैं।'),
+        tr('A planet in the same sign in D1 and D9 is "vargottama" (□) and gives steadier results. Exact birth time matters: higher vargas like D60 change every few minutes.',
+            'जो ग्रह D1 और D9 में एक ही राशि में हो वह "वर्गोत्तम" (□) कहलाता है और स्थिर फल देता है। जन्म समय सही होना ज़रूरी है: D60 जैसी ऊँची वर्ग कुंडलियाँ कुछ ही मिनटों में बदल जाती हैं।'),
+      ];
 
   Widget _buildVargaCard(BuildContext context, WidgetRef ref, VargaDef def) {
     final int lagnaVargaRashi = VedicMath.vargaRashi(chartData.ascendantSidereal, def.key, def.div);
@@ -49,8 +64,9 @@ class VargaScreen extends ConsumerWidget {
       chartData.planetLongitudes,
       lagnaVargaRashi,
       speeds: chartData.planetSpeeds,
-      signOverride: _vargaSigns(def),
+      signOverride: def.key == 'D1' ? null : _vargaSigns(def),
       showDegrees: def.key == 'D1',
+      ascendant: def.key == 'D1' ? chartData.ascendantSidereal : null,
     );
 
     return Card(
@@ -66,9 +82,9 @@ class VargaScreen extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('${def.key} - ${def.name}  ${def.hindi}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      Text(L10n.hi ? '${def.key} - ${def.hindi}  (${def.name})' : '${def.key} - ${def.name}  ${def.hindi}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 4),
-                      Text('${def.purpose} • Lagna ${VedicMath.rashis[lagnaVargaRashi].name}',
+                      Text('${def.purposeText} • ${tr('Lagna', 'लग्न')} ${L10n.sign(lagnaVargaRashi)}',
                           style: TextStyle(color: Theme.of(context).colorScheme.secondary, fontSize: 14)),
                     ],
                   ),
@@ -76,7 +92,7 @@ class VargaScreen extends ConsumerWidget {
                 IconButton(
                   icon: Icon(Icons.auto_awesome, color: Theme.of(context).colorScheme.secondary),
                   onPressed: () => _analyzeWholeVargaChart(context, ref, def, lagnaVargaRashi),
-                  tooltip: 'Analyze Holistic Chart',
+                  tooltip: tr('Analyze Holistic Chart', 'पूरी कुंडली का विश्लेषण'),
                 ),
               ],
             ),
@@ -138,6 +154,6 @@ ${placements.join('\n')}
 Provide a comprehensive reading of how these placements affect the native's "${def.purpose}". Focus on the interaction between the D1 Lagna Lord and the Varga Lagna Lord, planets holding the same sign in D1 and this Varga, the Karaka's position if applicable, and the Varga Ascendant. Do not provide a general life reading.
 ''';
 
-    showAiSheet(context, ref, title: '${def.key} - ${def.name} Analysis', prompt: prompt, profileId: profileId);
+    showAiSheet(context, ref, title: tr('${def.key} - ${def.name} Analysis', '${def.key} - ${def.hindi} विश्लेषण'), prompt: prompt, profileId: profileId);
   }
 }

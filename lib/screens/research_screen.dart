@@ -4,10 +4,10 @@ import '../core/conjunction_db.dart';
 import '../core/database.dart';
 import '../core/ephemeris.dart';
 import '../core/profile_chart.dart';
-import '../core/vedic_math.dart';
 import '../providers/profile_provider.dart';
 import '../providers/settings_provider.dart';
 import '../widgets/analysis_widgets.dart';
+import '../core/l10n.dart';
 
 class ResearchHit {
   final Profile profile;
@@ -83,20 +83,21 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
       bySign[h.conjunction.record.rashi] = (bySign[h.conjunction.record.rashi] ?? 0) + 1;
     }
     return Scaffold(
-      appBar: AppBar(title: const Text('Research')),
+      appBar: AppBar(title: Text(tr('Research', 'शोध'))),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(12, 12, 12, 32),
         children: [
           Text(
-            'Find a conjunction across your ${profiles.length} saved chart${profiles.length == 1 ? '' : 's'}. '
-            'Counts describe this sample only; they are not statistical evidence.',
+            tr('Find a conjunction across your ${profiles.length} saved chart${profiles.length == 1 ? '' : 's'}. '
+                'Counts describe this sample only; they are not statistical evidence.',
+                'अपनी ${profiles.length} सहेजी गई कुंडलियों में युति खोजें। गिनती केवल इसी नमूने का वर्णन करती है; यह सांख्यिकीय प्रमाण नहीं है।'),
             style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
           ),
           const SizedBox(height: 8),
           Wrap(spacing: 6, runSpacing: 4, children: [
             for (final p in ConjunctionDb.classical)
               FilterChip(
-                label: Text(VedicMath.planets[p]!.name),
+                label: Text(L10n.planet(p)),
                 selected: _planets.contains(p),
                 onSelected: (v) => setState(() {
                   v ? _planets.add(p) : _planets.remove(p);
@@ -110,10 +111,10 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
               child: DropdownButtonFormField<int?>(
                 isExpanded: true,
                 initialValue: _house,
-                decoration: const InputDecoration(labelText: 'House'),
+                decoration: InputDecoration(labelText: tr('House', 'भाव')),
                 items: [
-                  const DropdownMenuItem(value: null, child: Text('Any')),
-                  for (int h = 1; h <= 12; h++) DropdownMenuItem(value: h, child: Text(VedicMath.ordinal(h))),
+                  DropdownMenuItem(value: null, child: Text(tr('Any', 'कोई भी'))),
+                  for (int h = 1; h <= 12; h++) DropdownMenuItem(value: h, child: Text(L10n.ordinal(h))),
                 ],
                 onChanged: (v) => setState(() => _house = v),
               ),
@@ -123,10 +124,10 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
               child: DropdownButtonFormField<int?>(
                 isExpanded: true,
                 initialValue: _sign,
-                decoration: const InputDecoration(labelText: 'Sign'),
+                decoration: InputDecoration(labelText: tr('Sign', 'राशि')),
                 items: [
-                  const DropdownMenuItem(value: null, child: Text('Any')),
-                  for (int r = 0; r < 12; r++) DropdownMenuItem(value: r, child: Text(VedicMath.rashis[r].name, overflow: TextOverflow.ellipsis)),
+                  DropdownMenuItem(value: null, child: Text(tr('Any', 'कोई भी'))),
+                  for (int r = 0; r < 12; r++) DropdownMenuItem(value: r, child: Text(L10n.sign(r), overflow: TextOverflow.ellipsis)),
                 ],
                 onChanged: (v) => setState(() => _sign = v),
               ),
@@ -134,44 +135,45 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
           ]),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
-            title: const Text('Exactly these planets'),
-            subtitle: const Text('Off: any cluster that contains them'),
+            title: Text(tr('Exactly these planets', 'केवल यही ग्रह')),
+            subtitle: Text(tr('Off: any cluster that contains them', 'बंद: कोई भी समूह जिसमें ये ग्रह हों')),
             value: _exact,
             onChanged: (v) => setState(() => _exact = v),
           ),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
-            title: const Text('Activated by the current Daśā'),
+            title: Text(tr('Activated by the current Daśā', 'वर्तमान दशा से सक्रिय')),
             value: _activeNow,
             onChanged: (v) => setState(() => _activeNow = v),
           ),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
-            title: const Text('Repeated in the Navāṃśa (D9)'),
+            title: Text(tr('Repeated in the Navāṃśa (D9)', 'नवांश (D9) में दोहराई गई')),
             value: _d9,
             onChanged: (v) => setState(() => _d9 = v),
           ),
           ElevatedButton.icon(
             icon: const Icon(Icons.search),
-            label: const Text('Search saved charts'),
+            label: Text(tr('Search saved charts', 'सहेजी गई कुंडलियाँ खोजें')),
             onPressed: _planets.length < 2 || profiles.isEmpty ? null : () => _run(profiles),
           ),
-          if (_planets.length < 2) Text('Choose at least two planets.', style: TextStyle(fontSize: 12, color: scheme.error)),
+          if (_planets.length < 2) Text(tr('Choose at least two planets.', 'कम से कम दो ग्रह चुनें।'), style: TextStyle(fontSize: 12, color: scheme.error)),
           if (hits != null) ...[
             const SizedBox(height: 12),
             SectionCard(
-              title: '${hits.length} match${hits.length == 1 ? '' : 'es'} in $_searched chart${_searched == 1 ? '' : 's'}',
-              subtitle: ConjunctionDb.clusterIdOf(_planets) + (_exact ? ' (exact)' : ' (contained)'),
+              title: tr('${hits.length} match${hits.length == 1 ? '' : 'es'} in $_searched chart${_searched == 1 ? '' : 's'}',
+                  '$_searched कुंडलियों में ${hits.length} परिणाम'),
+              subtitle: ConjunctionDb.clusterIdOf(_planets) + (_exact ? tr(' (exact)', ' (केवल यही)') : tr(' (contained)', ' (शामिल)')),
               children: [
-                if (byHouse.isNotEmpty) KeyValueRow('By house', (byHouse.entries.toList()..sort((a, b) => a.key.compareTo(b.key))).map((e) => '${e.key}: ${e.value}').join(', ')),
+                if (byHouse.isNotEmpty) KeyValueRow(tr('By house', 'भाव अनुसार'), (byHouse.entries.toList()..sort((a, b) => a.key.compareTo(b.key))).map((e) => '${e.key}: ${e.value}').join(', ')),
                 if (bySign.isNotEmpty)
-                  KeyValueRow('By sign', (bySign.entries.toList()..sort((a, b) => a.key.compareTo(b.key))).map((e) => '${VedicMath.rashis[e.key].name}: ${e.value}').join(', ')),
+                  KeyValueRow(tr('By sign', 'राशि अनुसार'), (bySign.entries.toList()..sort((a, b) => a.key.compareTo(b.key))).map((e) => '${L10n.sign(e.key)}: ${e.value}').join(', ')),
                 for (final h in hits)
                   BulletLine(
                     '${h.profile.name}: ${h.conjunction.record.recordId} · ${h.conjunction.record.clusterLabel} · '
-                    'span ${h.conjunction.diagnostics.degreeSpan.toStringAsFixed(1)}°'
-                    '${h.repetition.isEmpty ? '' : ' · repeated in ${h.repetition.join(', ')}'}'
-                    '${h.conjunction.activeNow.isEmpty ? '' : ' · active now'}',
+                    '${tr('span', 'फैलाव')} ${h.conjunction.diagnostics.degreeSpan.toStringAsFixed(1)}°'
+                    '${h.repetition.isEmpty ? '' : ' · ${tr('repeated in', 'दोहराई गई')} ${h.repetition.join(', ')}'}'
+                    '${h.conjunction.activeNow.isEmpty ? '' : ' · ${tr('active now', 'अभी सक्रिय')}'}',
                     mark: '◆',
                   ),
               ],

@@ -6,6 +6,9 @@ import '../../core/transit_math.dart';
 import '../../core/vedic_math.dart';
 import '../../widgets/ai_sheet.dart';
 import '../../widgets/kundli_chart.dart';
+import '../../core/l10n.dart';
+import '../../core/plain/meanings.dart';
+import '../../widgets/analysis_widgets.dart';
 
 class TransitScreen extends ConsumerStatefulWidget {
   final ChartData chartData;
@@ -34,7 +37,7 @@ class _TransitScreenState extends ConsumerState<TransitScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Transits (Gochar)')),
+      appBar: AppBar(title: Text(tr('Transits (Gochar)', 'गोचर'))),
       body: ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: transits.length + 1,
@@ -50,17 +53,17 @@ class _TransitScreenState extends ConsumerState<TransitScreen> {
             child: ListTile(
               contentPadding: const EdgeInsets.all(16),
               leading: Text(t.planetData.symbol, style: TextStyle(fontSize: 32, color: t.planetData.color)),
-              title: Text('${t.planetData.name} in ${t.rashiData.name} ${VedicMath.formatDegree(t.sid)}${t.retrograde ? ' ℞' : ''}'),
+              title: Text('${tr('${t.planetData.name} in ${t.rashiData.name}', '${L10n.planet(t.planet)} ${L10n.sign(t.transitRashi)} में')} ${VedicMath.formatDegree(t.sid)}${t.retrograde ? ' ℞' : ''}'),
               subtitle: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 8),
-                  Text('House ${t.houseFromLagna} from Lagna • House ${t.houseFromMoon} from Moon',
+                  Text(tr('House ${t.houseFromLagna} from Lagna • House ${t.houseFromMoon} from Moon', 'लग्न से भाव ${t.houseFromLagna} • चन्द्र से भाव ${t.houseFromMoon}'),
                       style: const TextStyle(fontSize: 12, color: Colors.grey)),
                   if (t.aspectOnNatal != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
-                      child: Text('${t.aspectOnNatal} natal ${t.planetData.name}',
+                      child: Text(tr('${t.aspectOnNatal} natal ${t.planetData.name}', 'जन्म के ${L10n.planet(t.planet)} से ${t.aspectOnNatal}'),
                           style: const TextStyle(fontSize: 12, color: Colors.amber)),
                     ),
                   const SizedBox(height: 8),
@@ -86,32 +89,52 @@ class _TransitScreenState extends ConsumerState<TransitScreen> {
         child: Column(
           children: [
             SegmentedButton<bool>(
-              segments: const [
-                ButtonSegment<bool>(value: true, label: Text('From Moon'), icon: Icon(Icons.nightlight_round)),
-                ButtonSegment<bool>(value: false, label: Text('From Lagna'), icon: Icon(Icons.person)),
+              segments: [
+                ButtonSegment<bool>(value: true, label: Text(tr('From Moon', 'चन्द्र से')), icon: const Icon(Icons.nightlight_round)),
+                ButtonSegment<bool>(value: false, label: Text(tr('From Lagna', 'लग्न से')), icon: const Icon(Icons.person)),
               ],
               selected: {_viewFromMoon},
               onSelectionChanged: (s) => setState(() => _viewFromMoon = s.first),
             ),
             const SizedBox(height: 16),
-            Text('Transit Chart (${_viewFromMoon ? "Chandra Lagna" : "Natal Ascendant"})',
+            Text(tr('Transit Chart (${_viewFromMoon ? "Chandra Lagna" : "Natal Ascendant"})', 'गोचर कुंडली (${_viewFromMoon ? "चन्द्र लग्न" : "जन्म लग्न"})'),
                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
-            SizedBox(
-              height: 300,
-              child: KundliChart(
-                housePlanets: houses,
-                ascendantSign: _baseRashi + 1,
-                onHouseTapped: (house) => _handleHouseTapped(house, houses),
-              ),
+            KundliChart(
+              housePlanets: houses,
+              ascendantSign: _baseRashi + 1,
+              showLegend: true,
+              onHouseTapped: (house) => _handleHouseTapped(house, houses),
             ),
+            const SizedBox(height: 12),
+            SimpleMeaningCard(_plain()),
           ],
         ),
       ),
     );
   }
 
-  void _handleHouseTapped(int houseNum, Map<int, List<String>> houses) {
+  /// Plain summary: how many transits help, and where the slow planets are.
+  List<String> _plain() {
+    final good = transits.where((t) => t.effectType == 'good').map((t) => L10n.planet(t.planet)).toList();
+    final hard = transits.where((t) => t.effectType == 'difficult').map((t) => L10n.planet(t.planet)).toList();
+    String slow(String p) {
+      final t = transits.firstWhere((x) => x.planet == p);
+      return tr('${L10n.planet(p)} is passing your ${L10n.ordinal(t.houseFromMoon)} house from the Moon (${Meanings.house(t.houseFromMoon)}): ${t.effect}.',
+          '${L10n.planet(p)} चन्द्र से ${t.houseFromMoon}वें भाव (${Meanings.house(t.houseFromMoon)}) से गुज़र रहा है: ${t.effect}।');
+    }
+
+    return [
+      tr('Transits (Gochar) are where the planets are today, counted from your Moon sign. Slow planets (Saturn, Jupiter, Rahu, Ketu) shape the long phases of life; fast ones (Moon, Sun, Mercury, Venus, Mars) colour days and weeks.',
+          'गोचर का अर्थ है आज ग्रह कहाँ हैं, आपकी चन्द्र राशि से गिनकर। धीमे ग्रह (शनि, गुरु, राहु, केतु) जीवन के लंबे दौर तय करते हैं; तेज़ ग्रह (चन्द्र, सूर्य, बुध, शुक्र, मंगल) दिनों और हफ़्तों को रंगते हैं।'),
+      if (good.isNotEmpty) tr('Helpful now: ${L10n.join(good)}.', 'अभी सहायक: ${L10n.join(good)}।'),
+      if (hard.isNotEmpty) tr('Testing now: ${L10n.join(hard)}.', 'अभी परीक्षा लेने वाले: ${L10n.join(hard)}।'),
+      slow('saturn'),
+      slow('jupiter'),
+    ];
+  }
+
+  void _handleHouseTapped(int houseNum, Map<int, List<ChartLabel>> houses) {
     final planets = transits.where((t) => VedicMath.houseOf(t.transitRashi, _baseRashi) == houseNum).toList();
     final String baseName = _viewFromMoon ? 'the natal Moon sign (Chandra Lagna)' : 'the natal Ascendant';
     final sign = VedicMath.rashis[(_baseRashi + houseNum - 1) % 12].name;
@@ -124,6 +147,6 @@ class _TransitScreenState extends ConsumerState<TransitScreen> {
         'All current transits: ${transits.map((t) => '${t.planetData.name} in ${t.rashiData.name}').join(', ')}.\n\n'
         'Natal chart:\n${ChartSummary.describe(widget.chartData)}';
 
-    showAiSheet(context, ref, title: 'Transit House $houseNum Analysis', prompt: prompt, profileId: widget.profileId);
+    showAiSheet(context, ref, title: tr('Transit House $houseNum Analysis', 'गोचर भाव $houseNum विश्लेषण'), prompt: prompt, profileId: widget.profileId);
   }
 }

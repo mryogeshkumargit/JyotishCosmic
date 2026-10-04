@@ -64,6 +64,9 @@ class AppTheme {
     return _buildTheme(colorScheme);
   }
 
+  /// Bundled Devanagari font used for Hindi text (Inter and Cinzel have no Devanagari).
+  static const List<String> devanagariFallback = ['NotoSansDevanagari'];
+
   static ThemeData _buildTheme(ColorScheme colorScheme) {
     return ThemeData(
       useMaterial3: true,
@@ -80,7 +83,7 @@ class AppTheme {
         titleMedium: GoogleFonts.inter(color: colorScheme.onSurface, fontWeight: FontWeight.w600, fontSize: 16),
         bodyLarge: GoogleFonts.inter(color: colorScheme.onSurface, fontSize: 16),
         bodyMedium: GoogleFonts.inter(color: colorScheme.onSurfaceVariant, fontSize: 14),
-      ),
+      ).apply(fontFamilyFallback: devanagariFallback),
 
       // AppBar
       appBarTheme: AppBarTheme(
@@ -93,7 +96,7 @@ class AppTheme {
           color: colorScheme.primary,
           fontSize: 20,
           fontWeight: FontWeight.bold,
-        ),
+        ).copyWith(fontFamilyFallback: devanagariFallback),
       ),
 
       // Buttons
@@ -105,13 +108,13 @@ class AppTheme {
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           elevation: 6,
           shadowColor: colorScheme.primary.withValues(alpha: 0.4),
-          textStyle: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16),
+          textStyle: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16).copyWith(fontFamilyFallback: devanagariFallback),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: colorScheme.primary,
-          textStyle: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16),
+          textStyle: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16).copyWith(fontFamilyFallback: devanagariFallback),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -120,7 +123,7 @@ class AppTheme {
           side: BorderSide(color: colorScheme.primary, width: 1.5),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          textStyle: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16),
+          textStyle: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16).copyWith(fontFamilyFallback: devanagariFallback),
         ),
       ),
 

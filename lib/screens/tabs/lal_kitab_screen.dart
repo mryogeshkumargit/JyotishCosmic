@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/ephemeris.dart';
 import '../../core/lal_kitab_math.dart';
+import '../../core/l10n.dart';
 
 class LalKitabScreen extends StatefulWidget {
   final ChartData chartData;
@@ -12,18 +13,23 @@ class LalKitabScreen extends StatefulWidget {
 }
 
 class _LalKitabScreenState extends State<LalKitabScreen> {
-  late List<LalKitabPlanet> planets;
+  String? _lang;
+  late List<LalKitabPlanet> _planetsCache;
 
-  @override
-  void initState() {
-    super.initState();
-    planets = LalKitabMath.compute(widget.chartData);
+  /// Recomputed when the app language changes (the engine writes bilingual text).
+  List<LalKitabPlanet> get planets {
+    if (_lang != L10n.lang) {
+      _lang = L10n.lang;
+      _planetsCache = LalKitabMath.compute(widget.chartData);
+    }
+    return _planetsCache;
   }
+
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Lal Kitab')),
+      appBar: AppBar(title: Text(tr('Lal Kitab', 'लाल किताब'))),
       body: ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: planets.length,
@@ -34,8 +40,8 @@ class _LalKitabScreenState extends State<LalKitabScreen> {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             child: ExpansionTile(
               leading: Text(p.planetData.symbol, style: TextStyle(fontSize: 32, color: p.planetData.color)),
-              title: Text('${p.planetData.name} (${p.planetData.hindi})'),
-              subtitle: Text('House ${p.natalHouse} • Kalpurush Sign: ${p.rashiData.name}'),
+              title: Text(L10n.hi ? p.planetData.hindi : '${p.planetData.name} (${p.planetData.hindi})'),
+              subtitle: Text(tr('House ${p.natalHouse} • Kalpurush Sign: ${p.rashiData.name}', 'भाव ${p.natalHouse} • कालपुरुष राशि: ${p.rashiData.hindi}')),
               trailing: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
@@ -43,7 +49,7 @@ class _LalKitabScreenState extends State<LalKitabScreen> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  p.isSleeping ? 'Sleeping' : 'Awake',
+                  p.isSleeping ? tr('Sleeping', 'सोया हुआ') : tr('Awake', 'जाग्रत'),
                   style: TextStyle(color: p.isSleeping ? Colors.grey : Colors.green, fontWeight: FontWeight.bold),
                 ),
               ),
@@ -57,7 +63,7 @@ class _LalKitabScreenState extends State<LalKitabScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Remedy: ${p.remedy}',
+                          '${tr('Remedy', 'उपाय')}: ${p.remedy}',
                           style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 14),
                         ),
                       ),

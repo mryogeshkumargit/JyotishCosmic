@@ -4,6 +4,7 @@ import '../core/database.dart';
 import '../core/profile_chart.dart';
 import '../providers/profile_provider.dart';
 import 'kundli_result_screen.dart';
+import '../core/l10n.dart';
 
 /// List of saved profiles (stored only on this device).
 class ProfileScreen extends ConsumerWidget {
@@ -13,13 +14,13 @@ class ProfileScreen extends ConsumerWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete Profile'),
-        content: Text('Are you sure you want to delete ${profile.name}? This cannot be undone.'),
+        title: Text(tr('Delete Profile', 'प्रोफ़ाइल हटाएँ')),
+        content: Text(tr('Are you sure you want to delete ${profile.name}? This cannot be undone.', 'क्या आप ${profile.name} को हटाना चाहते हैं? इसे वापस नहीं लाया जा सकता।')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Cancel', 'रद्द करें'))),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            child: Text(tr('Delete', 'हटाएँ'), style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -27,7 +28,7 @@ class ProfileScreen extends ConsumerWidget {
     if (confirmed == true) {
       await ref.read(profileNotifierProvider.notifier).deleteProfile(profile);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${profile.name} deleted')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('${profile.name} deleted', '${profile.name} हटाया गया'))));
       }
     }
     return confirmed == true;
@@ -45,7 +46,7 @@ class ProfileScreen extends ConsumerWidget {
         data: (profiles) {
           if (profiles.isEmpty) {
             return Center(
-              child: Text('No profiles found. Tap + to create one.',
+              child: Text(tr('No profiles found. Tap + to create one.', 'कोई प्रोफ़ाइल नहीं। बनाने के लिए + दबाएँ।'),
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(color: scheme.onSurfaceVariant)),
             );
           }
@@ -92,9 +93,9 @@ class ProfileScreen extends ConsumerWidget {
                           _confirmDelete(context, ref, profile);
                         }
                       },
-                      itemBuilder: (context) => const [
-                        PopupMenuItem(value: 'edit', child: Text('Edit')),
-                        PopupMenuItem(value: 'delete', child: Text('Delete', style: TextStyle(color: Colors.red))),
+                      itemBuilder: (context) => [
+                        PopupMenuItem(value: 'edit', child: Text(tr('Edit', 'संपादित करें'))),
+                        PopupMenuItem(value: 'delete', child: Text(tr('Delete', 'हटाएँ'), style: const TextStyle(color: Colors.red))),
                       ],
                     ),
                     onTap: () {
@@ -107,12 +108,12 @@ class ProfileScreen extends ConsumerWidget {
           );
         },
         loading: () => Center(child: CircularProgressIndicator(color: scheme.secondary)),
-        error: (err, stack) => Center(child: Text('Error: $err')),
+        error: (err, stack) => Center(child: Text('${tr('Error', 'त्रुटि')}: $err')),
       ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: scheme.secondary,
         foregroundColor: scheme.onSecondary,
-        tooltip: 'New Kundali',
+        tooltip: tr('New Kundali', 'नई कुंडली'),
         onPressed: () {
           ref.read(editProfileProvider.notifier).setProfile(null);
           _goToNewTab(context);

@@ -1,4 +1,5 @@
 import 'ephemeris.dart';
+import 'l10n.dart';
 import 'vedic_math.dart';
 
 /// A Jaimini Chara Karaka (variable significator).
@@ -55,21 +56,26 @@ class JaiminiResult {
 /// configurable (CalcConfig.karakaScheme). Scorpio and Aquarius use their
 /// primary lords (Mars and Saturn), which is a simplifying convention.
 class JaiminiMath {
-  static const List<(String, String, String)> _eight = [
-    ('AK', 'Ātmakāraka', 'self, soul'),
-    ('AmK', 'Amātyakāraka', 'career, counsel'),
-    ('BK', 'Bhrātṛkāraka', 'siblings, effort'),
-    ('MK', 'Mātṛkāraka', 'mother, home'),
-    ('PiK', 'Pitṛkāraka', 'father'),
-    ('PK', 'Putrakāraka', 'children, creativity'),
-    ('GK', 'Jñātikāraka', 'rivals, obstacles'),
-    ('DK', 'Dārakāraka', 'spouse, partnerships'),
+  static const List<(String, String, String, String, String)> _eight = [
+    ('AK', 'Ātmakāraka', 'self, soul', 'आत्मकारक', 'स्वयं, आत्मा'),
+    ('AmK', 'Amātyakāraka', 'career, counsel', 'अमात्यकारक', 'करियर, परामर्श'),
+    ('BK', 'Bhrātṛkāraka', 'siblings, effort', 'भ्रातृकारक', 'भाई-बहन, प्रयास'),
+    ('MK', 'Mātṛkāraka', 'mother, home', 'मातृकारक', 'माता, घर'),
+    ('PiK', 'Pitṛkāraka', 'father', 'पितृकारक', 'पिता'),
+    ('PK', 'Putrakāraka', 'children, creativity', 'पुत्रकारक', 'संतान, रचनात्मकता'),
+    ('GK', 'Jñātikāraka', 'rivals, obstacles', 'ज्ञातिकारक', 'प्रतिद्वंद्वी, बाधाएँ'),
+    ('DK', 'Dārakāraka', 'spouse, partnerships', 'दारकारक', 'जीवनसाथी, साझेदारी'),
   ];
 
-  static const List<String> padaNames = [
+  static const List<String> _padaNamesEn = [
     'Ārūḍha Lagna', 'Dhana Pada', 'Bhrātṛ Pada', 'Mātṛ Pada', 'Mantra Pada', 'Śatru Pada',
     'Dāra Pada', 'Roga Pada', 'Bhāgya Pada', 'Rājya Pada', 'Lābha Pada', 'Upapada',
   ];
+  static const List<String> _padaNamesHi = [
+    'आरूढ़ लग्न', 'धन पद', 'भ्रातृ पद', 'मातृ पद', 'मंत्र पद', 'शत्रु पद', 'दार पद', 'रोग पद', 'भाग्य पद', 'राज्य पद', 'लाभ पद', 'उपपद',
+  ];
+
+  static List<String> get padaNames => L10n.hi ? _padaNamesHi : _padaNamesEn;
 
   /// Chara Karakas ranked by degree within the sign, highest first.
   static List<CharaKaraka> karakas(ChartData c, {int scheme = 8}) {
@@ -85,7 +91,7 @@ class JaiminiMath {
     });
     return [
       for (int i = 0; i < candidates.length && i < names.length; i++)
-        CharaKaraka(names[i].$1, names[i].$2, names[i].$3, candidates[i].$1, candidates[i].$2),
+        CharaKaraka(names[i].$1, L10n.hi ? names[i].$4 : names[i].$2, L10n.hi ? names[i].$5 : names[i].$3, candidates[i].$1, candidates[i].$2),
     ];
   }
 

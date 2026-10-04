@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/chart_summary.dart';
 import '../../core/ephemeris.dart';
 import '../../widgets/ai_chat_view.dart';
+import '../../core/l10n.dart';
 
 class AiChatScreen extends StatelessWidget {
   final ChartData chartData;
@@ -13,7 +14,7 @@ class AiChatScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Ask AI')),
+      appBar: AppBar(title: Text(tr('Ask AI', 'AI से पूछें'))),
       body: AiChatView(
         chartContext: ChartSummary.describe(chartData, name: name),
         profileId: profileId,

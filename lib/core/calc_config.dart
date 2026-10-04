@@ -1,3 +1,5 @@
+import 'l10n.dart';
+
 /// Calculation conventions where Jyotisha traditions differ (Volume 4 §25).
 ///
 /// Every engine that depends on one of these choices takes a [CalcConfig] and
@@ -112,14 +114,14 @@ class CalcConfig {
       );
 
   String get nodeAspectLabel => switch (nodeAspects) {
-        NodeAspectRule.none => 'Rahu/Ketu cast no aspect',
-        NodeAspectRule.seventh => 'Rahu/Ketu aspect the 7th only',
-        NodeAspectRule.fiveSevenNine => 'Rahu/Ketu aspect the 5th, 7th and 9th',
+        NodeAspectRule.none => tr('Rahu/Ketu cast no aspect', 'राहु/केतु की कोई दृष्टि नहीं'),
+        NodeAspectRule.seventh => tr('Rahu/Ketu aspect the 7th only', 'राहु/केतु की केवल सातवीं दृष्टि'),
+        NodeAspectRule.fiveSevenNine => tr('Rahu/Ketu aspect the 5th, 7th and 9th', 'राहु/केतु की 5वीं, 7वीं और 9वीं दृष्टि'),
       };
 
   String get warRuleLabel => switch (warRule) {
-        WarRule.northernLatitude => 'More northern latitude wins (Surya Siddhanta / BPHS)',
-        WarRule.venusAlwaysWins => 'Venus always wins, otherwise northern latitude (Brihat Samhita)',
+        WarRule.northernLatitude => tr('More northern latitude wins (Surya Siddhanta / BPHS)', 'अधिक उत्तरी शर वाला विजयी (सूर्य सिद्धांत / BPHS)'),
+        WarRule.venusAlwaysWins => tr('Venus always wins, otherwise northern latitude (Brihat Samhita)', 'शुक्र सदा विजयी, अन्यथा उत्तरी शर (बृहत् संहिता)'),
       };
 
   /// Rule versions for the audit log.

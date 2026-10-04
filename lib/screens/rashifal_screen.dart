@@ -9,6 +9,7 @@ import '../providers/profile_provider.dart';
 import '../providers/settings_provider.dart';
 import '../services/ai_service.dart';
 import '../widgets/ai_sheet.dart';
+import '../core/l10n.dart';
 
 class RashifalScreen extends ConsumerStatefulWidget {
   const RashifalScreen({super.key});
@@ -65,11 +66,11 @@ class _RashifalScreenState extends ConsumerState<RashifalScreen> {
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Rashifal')),
+      appBar: AppBar(title: Text(tr('Rashifal', 'राशिफल'))),
       body: profilesAsync.when(
         data: (profiles) {
           if (profiles.isEmpty) {
-            return const Center(child: Text('Create a profile to view your Rashifal.'));
+            return Center(child: Text(tr('Create a profile to view your Rashifal.', 'राशिफल देखने के लिए एक प्रोफ़ाइल बनाएँ।')));
           }
           Profile? selected;
           for (final p in profiles) {
@@ -84,7 +85,7 @@ class _RashifalScreenState extends ConsumerState<RashifalScreen> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
                 child: DropdownButtonFormField<int>(
-                  decoration: const InputDecoration(labelText: 'Select Profile'),
+                  decoration: InputDecoration(labelText: tr('Select Profile', 'प्रोफ़ाइल चुनें')),
                   initialValue: profile.id,
                   isExpanded: true,
                   items: profiles.map((p) => DropdownMenuItem<int>(value: p.id, child: Text(p.name))).toList(),
@@ -99,8 +100,10 @@ class _RashifalScreenState extends ConsumerState<RashifalScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              Text('Moon sign: ${VedicMath.rashis[VedicMath.rashiIndex(moonSid)].name} '
-                  '(${VedicMath.rashis[VedicMath.rashiIndex(moonSid)].hindi})',
+              Text(
+                  L10n.hi
+                      ? 'चन्द्र राशि: ${VedicMath.rashis[VedicMath.rashiIndex(moonSid)].hindi}'
+                      : 'Moon sign: ${VedicMath.rashis[VedicMath.rashiIndex(moonSid)].name} (${VedicMath.rashis[VedicMath.rashiIndex(moonSid)].hindi})',
                   style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 16),
               Padding(
@@ -118,7 +121,7 @@ class _RashifalScreenState extends ConsumerState<RashifalScreen> {
                         backgroundColor: _activeTab == tab ? scheme.primary : scheme.surfaceContainerHighest,
                         foregroundColor: _activeTab == tab ? scheme.onPrimary : scheme.onSurface,
                       ),
-                      child: FittedBox(fit: BoxFit.scaleDown, child: Text(tab)),
+                      child: FittedBox(fit: BoxFit.scaleDown, child: Text(tr(tab, const {'Daily': 'दैनिक', 'Weekly': 'साप्ताहिक', 'Monthly': 'मासिक'}[tab]!))),
                     ),
                       ),
                     ),
@@ -158,14 +161,14 @@ class _RashifalScreenState extends ConsumerState<RashifalScreen> {
                                 ),
                               )
                             : Center(
-                                child: Text('Select a timeframe to view the horoscope.',
+                                child: Text(tr('Select a timeframe to view the horoscope.', 'राशिफल देखने के लिए अवधि चुनें।'),
                                     style: TextStyle(color: scheme.onSurfaceVariant))),
               ),
             ],
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(child: Text('Error: $err')),
+        error: (err, _) => Center(child: Text('${tr('Error', 'त्रुटि')}: $err')),
       ),
     );
   }

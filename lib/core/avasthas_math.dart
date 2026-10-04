@@ -1,3 +1,4 @@
+import 'l10n.dart';
 import 'ephemeris.dart';
 import 'vedic_math.dart';
 import 'planetary_dignity.dart';
@@ -31,15 +32,15 @@ class AvasthasMath {
 
       String baladi;
       if (deg < 6) {
-        baladi = isOdd ? 'Infant (Baala)' : 'Dead (Mrita)';
+        baladi = isOdd ? tr('Infant (Baala)', 'बाल') : tr('Dead (Mrita)', 'मृत');
       } else if (deg < 12) {
-        baladi = isOdd ? 'Youth (Kumara)' : 'Old (Vriddha)';
+        baladi = isOdd ? tr('Youth (Kumara)', 'कुमार') : tr('Old (Vriddha)', 'वृद्ध');
       } else if (deg < 18) {
-        baladi = 'Adult (Yuva)';
+        baladi = tr('Adult (Yuva)', 'युवा');
       } else if (deg < 24) {
-        baladi = isOdd ? 'Old (Vriddha)' : 'Youth (Kumara)';
+        baladi = isOdd ? tr('Old (Vriddha)', 'वृद्ध') : tr('Youth (Kumara)', 'कुमार');
       } else {
-        baladi = isOdd ? 'Dead (Mrita)' : 'Infant (Baala)';
+        baladi = isOdd ? tr('Dead (Mrita)', 'मृत') : tr('Infant (Baala)', 'बाल');
       }
 
       // Jagradadi: awake in own/exaltation/moolatrikona, dreaming in a friendly or
@@ -47,11 +48,11 @@ class AvasthasMath {
       final String dignity = PlanetaryDignity.getAdvancedDignity(pName, ri, rashis);
       String jagradadi;
       if (dignity == 'Exalted' || dignity == 'Own Sign' || dignity == 'Moolatrikona') {
-        jagradadi = 'Awake (Jagrata)';
+        jagradadi = tr('Awake (Jagrata)', 'जाग्रत');
       } else if (dignity == 'Debilitated' || dignity.contains('Enemy')) {
-        jagradadi = 'Sleeping (Sushupti)';
+        jagradadi = tr('Sleeping (Sushupti)', 'सुषुप्त');
       } else {
-        jagradadi = 'Dreaming (Swapna)';
+        jagradadi = tr('Dreaming (Swapna)', 'स्वप्न');
       }
 
       result.add(AvasthaData(pName, VedicMath.planets[pName]!, deg, ri, baladi, jagradadi));

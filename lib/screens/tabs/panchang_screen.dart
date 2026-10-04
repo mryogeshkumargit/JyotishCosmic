@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import '../../core/ephemeris.dart';
 import '../../core/panchang_math.dart';
 import '../../services/location_service.dart';
+import '../../core/l10n.dart';
+import '../../core/nakshatra_hi.dart';
+import '../../core/vedic_math.dart';
+import '../../widgets/analysis_widgets.dart';
 
 /// Panchang at birth or for today, at the birth place.
 class PanchangScreen extends StatefulWidget {
@@ -43,16 +47,20 @@ class _PanchangScreenState extends State<PanchangScreen> {
     final karana = panchang['karana'] as Map<String, String>;
     final local = Ephemeris.jdToUtc(chart.jd).add(Duration(minutes: (offset * 60).round()));
     String two(int v) => v.toString().padLeft(2, '0');
+    String both(Object? en, Object? hi) => L10n.hi ? '$hi' : '$en ($hi)';
+    final nakIdx = VedicMath.nakshatraIndex(chart.planetLongitudes['moon']!);
+    String lord(String name) => L10n.hi ? L10n.planet(name.toLowerCase()) : name;
+    const tithiTypes = {'Nanda': 'नंदा', 'Bhadra': 'भद्रा', 'Jaya': 'जया', 'Rikta': 'रिक्ता', 'Purna': 'पूर्णा'};
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Panchang')),
+      appBar: AppBar(title: Text(tr('Panchang', 'पंचांग'))),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           SegmentedButton<bool>(
-            segments: const [
-              ButtonSegment(value: true, label: Text('Today'), icon: Icon(Icons.today)),
-              ButtonSegment(value: false, label: Text('At Birth'), icon: Icon(Icons.child_care)),
+            segments: [
+              ButtonSegment(value: true, label: Text(tr('Today', 'आज')), icon: const Icon(Icons.today)),
+              ButtonSegment(value: false, label: Text(tr('At Birth', 'जन्म के समय')), icon: const Icon(Icons.child_care)),
             ],
             selected: {_today},
             onSelectionChanged: (s) => setState(() => _today = s.first),
@@ -60,24 +68,34 @@ class _PanchangScreenState extends State<PanchangScreen> {
           const SizedBox(height: 8),
           Text(
             '${local.year}-${two(local.month)}-${two(local.day)} ${two(local.hour)}:${two(local.minute)} '
-            'at ${widget.lat.toStringAsFixed(2)}, ${widget.lon.toStringAsFixed(2)}',
+            '${tr('at', 'स्थान')} ${widget.lat.toStringAsFixed(2)}, ${widget.lon.toStringAsFixed(2)}',
             textAlign: TextAlign.center,
             style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12),
           ),
           const SizedBox(height: 12),
-          _buildInfoCard(context, 'Tithi', '${tithi['name']} (${tithi['hindi']})', 'Type: ${tithi['type']} | Paksha: ${paksha['en']}'),
-          _buildInfoCard(context, 'Nakshatra', '${nak['name']} (${nak['hindi']})', 'Lord: ${nak['lord']} | Deity: ${nak['deity']} | Pada: ${nak['pada']}'),
-          _buildInfoCard(context, 'Karana', '${karana['en']} (${karana['hi']})', ''),
-          _buildInfoCard(context, 'Yoga', '${yoga['en']} (${yoga['hi']})', ''),
-          _buildInfoCard(context, 'Vara (Day, sunrise to sunrise)', '${vara['name']} (${vara['hindi']})', 'Lord: ${vara['lord']}'),
+          SimpleMeaningCard([
+            tr('The Panchang ("five limbs") describes the quality of a moment: the lunar day (Tithi), the Moon\'s star (Nakshatra), the Sun–Moon combination (Yoga), '
+                'the half lunar day (Karana) and the weekday (Vara). It is used to choose good times and to understand the mood of a day.',
+                'पंचांग ("पाँच अंग") किसी समय की गुणवत्ता बताता है: चन्द्र दिवस (तिथि), चन्द्र का नक्षत्र, सूर्य-चन्द्र का योग, आधी तिथि (करण) और वार। '
+                    'इसका उपयोग शुभ समय चुनने और दिन का स्वभाव समझने के लिए होता है।'),
+            tr('Rahu Kaal, Yamaganda and Gulika Kaal are short daily periods traditionally avoided for starting new work.',
+                'राहु काल, यमगंड और गुलिक काल दिन के छोटे समय हैं, जिनमें परंपरा से नए काम की शुरुआत टाली जाती है।'),
+          ]),
+          _buildInfoCard(context, tr('Tithi', 'तिथि'), both(tithi['name'], tithi['hindi']),
+              '${tr('Type', 'प्रकार')}: ${tr('${tithi['type']}', tithiTypes[tithi['type']] ?? '${tithi['type']}')} | ${tr('Paksha', 'पक्ष')}: ${tr(paksha['en']!, paksha['hi']!)}'),
+          _buildInfoCard(context, tr('Nakshatra', 'नक्षत्र'), both(nak['name'], nak['hindi']),
+              '${tr('Lord', 'स्वामी')}: ${lord('${nak['lord']}')} | ${tr('Deity', 'देवता')}: ${NakshatraHi.deity(nakIdx)} | ${tr('Pada', 'पद')}: ${nak['pada']}'),
+          _buildInfoCard(context, tr('Karana', 'करण'), both(karana['en'], karana['hi']), ''),
+          _buildInfoCard(context, tr('Yoga', 'योग'), both(yoga['en'], yoga['hi']), ''),
+          _buildInfoCard(context, tr('Vara (Day, sunrise to sunrise)', 'वार (सूर्योदय से सूर्योदय)'), both(vara['name'], vara['hindi']), '${tr('Lord', 'स्वामी')}: ${lord('${vara['lord']}')}'),
           const SizedBox(height: 24),
-          Text('Important Timings (local time)',
+          Text(tr('Important Timings (local time)', 'महत्वपूर्ण समय (स्थानीय)'),
               style: TextStyle(color: Theme.of(context).colorScheme.secondary, fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          _buildTimingCard(context, 'Sunrise / Sunset', '${panchang['sunrise']} - ${panchang['sunset']}', Icons.wb_sunny),
-          _buildTimingCard(context, 'Rahu Kaal', '${panchang['rahuKaal']['start']} - ${panchang['rahuKaal']['end']}', Icons.warning_amber),
-          _buildTimingCard(context, 'Yamaganda', '${panchang['yamaganda']['start']} - ${panchang['yamaganda']['end']}', Icons.block),
-          _buildTimingCard(context, 'Gulika Kaal', '${panchang['gulikaKaal']['start']} - ${panchang['gulikaKaal']['end']}', Icons.timer),
+          _buildTimingCard(context, tr('Sunrise / Sunset', 'सूर्योदय / सूर्यास्त'), '${panchang['sunrise']} - ${panchang['sunset']}', Icons.wb_sunny),
+          _buildTimingCard(context, tr('Rahu Kaal', 'राहु काल'), '${panchang['rahuKaal']['start']} - ${panchang['rahuKaal']['end']}', Icons.warning_amber),
+          _buildTimingCard(context, tr('Yamaganda', 'यमगंड'), '${panchang['yamaganda']['start']} - ${panchang['yamaganda']['end']}', Icons.block),
+          _buildTimingCard(context, tr('Gulika Kaal', 'गुलिक काल'), '${panchang['gulikaKaal']['start']} - ${panchang['gulikaKaal']['end']}', Icons.timer),
         ],
       ),
     );

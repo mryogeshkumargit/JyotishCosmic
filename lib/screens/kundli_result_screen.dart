@@ -27,6 +27,7 @@ import 'tabs/conjunctions_screen.dart';
 import 'tabs/strength_screen.dart';
 import 'tabs/ashtakavarga_screen.dart';
 import 'tabs/synthesis_screen.dart';
+import '../core/l10n.dart';
 
 class KundliResultScreen extends ConsumerStatefulWidget {
   final String name;
@@ -66,6 +67,14 @@ class KundliResultScreen extends ConsumerStatefulWidget {
         profileId: p.id,
       );
 
+  /// Hindi titles of the feature buttons (the English title is the key).
+  static const Map<String, String> hindiTitles = {
+    'Synthesis': 'संश्लेषण', 'Planet': 'ग्रह', 'Dasha': 'दशा', 'Predictions': 'भविष्यफल', 'KP System': 'केपी पद्धति',
+    'Shodashvarga': 'षोडशवर्ग', 'Lal Kitab': 'लाल किताब', 'Barshphal': 'वर्षफल', 'Transit': 'गोचर', 'Nakshatra': 'नक्षत्र',
+    'Avasthas': 'अवस्थाएँ', 'Panchang': 'पंचांग', 'Dosha': 'दोष', 'Yogas': 'योग', 'Conjunctions': 'युति', 'Strength': 'ग्रह बल',
+    'Ashtakavarga': 'अष्टकवर्ग', 'Remedies': 'उपाय', 'Interpretation': 'फलादेश', 'Ask AI': 'AI से पूछें',
+  };
+
   @override
   ConsumerState<KundliResultScreen> createState() => _KundliResultScreenState();
 }
@@ -96,6 +105,7 @@ class _KundliResultScreenState extends ConsumerState<KundliResultScreen> {
     ('Ask AI', Icons.chat_bubble_outline),
   ];
 
+
   @override
   void initState() {
     super.initState();
@@ -117,7 +127,7 @@ class _KundliResultScreenState extends ConsumerState<KundliResultScreen> {
     final prompt = 'Analyze house $houseNum of this Vedic birth chart in detail.\n\n'
         '${ChartSummary.describeHouse(_chartData, houseNum)}\n\n'
         'Full chart for context:\n${ChartSummary.describe(_chartData, name: widget.name)}';
-    showAiSheet(context, ref, title: 'House $houseNum Analysis', prompt: prompt, profileId: widget.profileId);
+    showAiSheet(context, ref, title: tr('House $houseNum Analysis', 'भाव $houseNum विश्लेषण'), prompt: prompt, profileId: widget.profileId);
   }
 
   void _open(Widget screen) => Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
@@ -176,11 +186,11 @@ class _KundliResultScreenState extends ConsumerState<KundliResultScreen> {
     final moon = _chartData.planetLongitudes['moon']!;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Horoscope'),
+        title: Text(tr('Horoscope', 'कुंडली')),
         actions: [
           IconButton(
             icon: const Icon(Icons.picture_as_pdf),
-            tooltip: 'Export PDF',
+            tooltip: tr('Export PDF', 'PDF निर्यात'),
             onPressed: () => PdfService().generateAndShareAstrologicalReport(
               _chartData,
               widget.name,
@@ -200,17 +210,18 @@ class _KundliResultScreenState extends ConsumerState<KundliResultScreen> {
               Text(widget.place!, style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12), textAlign: TextAlign.center),
             const SizedBox(height: 8),
             Text(
-              'Lagna ${VedicMath.rashis[_chartData.lagnaRashi].name} ${VedicMath.formatDegree(asc)}  •  '
-              'Moon ${VedicMath.rashis[VedicMath.rashiIndex(moon)].name}, ${VedicMath.nakshatras[VedicMath.nakshatraIndex(moon)].name}',
+              '${tr('Lagna', 'लग्न')} ${L10n.sign(_chartData.lagnaRashi)} ${VedicMath.formatDegree(asc)}  •  '
+              '${tr('Moon', 'चन्द्र')} ${L10n.sign(VedicMath.rashiIndex(moon))}, ${L10n.nakshatra(VedicMath.nakshatraIndex(moon))}',
               style: TextStyle(color: scheme.onSurface, fontSize: 13),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 4),
-            Text('Tap on any house for AI interpretation',
+            Text(tr('Tap on any house for AI interpretation', 'AI विश्लेषण के लिए किसी भी भाव पर टैप करें'),
                 style: TextStyle(color: scheme.secondary.withValues(alpha: 0.8), fontSize: 12)),
             KundliChart(
               housePlanets: chartLabels(_chartData),
               ascendantSign: _chartData.lagnaRashi + 1,
+              showLegend: true,
               onHouseTapped: _handleHouseTapped,
             ),
             const SizedBox(height: 16),
@@ -248,7 +259,7 @@ class _KundliResultScreenState extends ConsumerState<KundliResultScreen> {
             children: [
               Icon(icon, color: scheme.secondary, size: 28),
               const SizedBox(height: 8),
-              Text(title,
+              Text(L10n.hi ? (KundliResultScreen.hindiTitles[title] ?? title) : title,
                   textAlign: TextAlign.center,
                   style: TextStyle(color: scheme.onSurface, fontSize: 11, fontWeight: FontWeight.bold)),
             ],

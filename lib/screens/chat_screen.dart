@@ -6,6 +6,7 @@ import '../core/profile_chart.dart';
 import '../providers/profile_provider.dart';
 import '../widgets/ai_chat_view.dart';
 import 'kundali_screen.dart';
+import '../core/l10n.dart';
 
 /// Dashboard "Ask AI" tab: chat with a saved profile's chart as context.
 class ChatScreen extends ConsumerStatefulWidget {
@@ -26,7 +27,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     return SafeArea(
       child: profilesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(child: Text('Error: $err')),
+        error: (err, _) => Center(child: Text('${tr('Error', 'त्रुटि')}: $err')),
         data: (profiles) {
           Profile? selected;
           for (final p in profiles) {
@@ -50,12 +51,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<int?>(
                           isExpanded: true,
-                          hint: const Text('No Kundali context'),
+                          hint: Text(tr('No Kundali context', 'कोई कुंडली संदर्भ नहीं')),
                           value: selected?.id,
                           items: [
                             ...profiles.map((p) => DropdownMenuItem<int?>(
                                   value: p.id,
-                                  child: Text('Context: ${p.name}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                  child: Text('${tr('Context', 'संदर्भ')}: ${p.name}', style: const TextStyle(fontWeight: FontWeight.bold)),
                                 )),
                             DropdownMenuItem<int?>(
                               value: -1,
@@ -63,7 +64,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                 children: [
                                   Icon(Icons.add_circle_outline, color: scheme.primary, size: 20),
                                   const SizedBox(width: 8),
-                                  Text('Create New Kundali',
+                                  Text(tr('Create New Kundali', 'नई कुंडली बनाएँ'),
                                       style: TextStyle(color: scheme.primary, fontWeight: FontWeight.bold)),
                                 ],
                               ),
@@ -90,9 +91,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   chartContext: selected == null ? null : ChartSummary.describe(selected.computeChart(), name: selected.name),
                   profileId: selected?.id,
                   greeting: selected == null
-                      ? 'Namaste. Create a Kundali to get answers based on your chart, or ask a general question.'
-                      : 'Namaste. Ask me anything about ${selected.name}\'s chart.',
-                  hint: 'Ask about your Dasha or Gochar...',
+                      ? tr('Namaste. Create a Kundali to get answers based on your chart, or ask a general question.', 'नमस्ते। अपनी कुंडली पर आधारित उत्तर पाने के लिए कुंडली बनाएँ, या कोई सामान्य प्रश्न पूछें।')
+                      : tr('Namaste. Ask me anything about ${selected.name}\'s chart.', 'नमस्ते। ${selected.name} की कुंडली के बारे में कुछ भी पूछें।'),
+                  hint: tr('Ask about your Dasha or Gochar...', 'अपनी दशा या गोचर के बारे में पूछें...'),
                 ),
               ),
             ],

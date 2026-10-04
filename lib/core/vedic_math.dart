@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'l10n.dart';
 
 class Rashi {
   final int id;
@@ -47,6 +48,31 @@ class VargaDef {
   final String purpose;
 
   const VargaDef(this.key, this.div, this.name, this.hindi, this.purpose);
+
+  static const Map<String, String> _purposeHi = {
+    'D1': 'संपूर्ण व्यक्तित्व',
+    'D2': 'धन',
+    'D3': 'भाई-बहन और साहस',
+    'D4': 'संपत्ति और जायदाद',
+    'D7': 'संतान',
+    'D9': 'विवाह और धर्म',
+    'D10': 'करियर',
+    'D12': 'माता-पिता',
+    'D16': 'वाहन और सुख-सुविधा',
+    'D20': 'आध्यात्मिकता',
+    'D24': 'शिक्षा',
+    'D27': 'बल',
+    'D30': 'कष्ट और दुर्भाग्य',
+    'D40': 'शुभता (मातृ पक्ष)',
+    'D45': 'सभी विषय (पितृ पक्ष)',
+    'D60': 'पूर्व जन्म के कर्म',
+  };
+
+  /// Purpose in the app language.
+  String get purposeText => L10n.hi ? (_purposeHi[key] ?? purpose) : purpose;
+
+  /// Name in the app language.
+  String get displayName => L10n.hi ? hindi : name;
 }
 
 class VedicMath {
@@ -240,8 +266,7 @@ class VedicMath {
     int day = b - d - (30.6001 * e).floor();
     int month = e < 14 ? e - 1 : e - 13;
     int year = month > 2 ? c - 4716 : c - 4715;
-    const m = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return "$day ${m[month - 1]} $year";
+    return "$day ${L10n.month(month)} $year";
   }
 }
 

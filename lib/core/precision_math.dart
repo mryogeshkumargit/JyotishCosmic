@@ -2,22 +2,26 @@ import 'dart:math' as math;
 
 import 'calc_config.dart';
 import 'ephemeris.dart';
+import 'l10n.dart';
 import 'planetary_dignity.dart';
 import 'vedic_math.dart';
 
 /// Evidence classes (Volume 4 §26, Volume 5 §3, Volume 6 §17).
 enum SourceTier {
-  classicalDirect('DIRECT_CLASSICAL', 'Exact classical rule'),
-  classicalDerived('CLASSICAL_DERIVED', 'Direct calculation from a classical method'),
-  multiSourceConvergence('MULTI_SOURCE_CONVERGENCE', 'Several classical rules agree'),
-  configurableTradition('CONFIGURABLE_TRADITION', 'Depends on a configurable convention'),
-  systematicSynthesis('SYSTEMATIC_SYNTHESIS', 'Database synthesis, not a quoted classical rule'),
-  engineeringHeuristic('ENGINEERING_HEURISTIC', 'Software heuristic for ranking or display; not a classical rule'),
-  insufficientInput('INSUFFICIENT_INPUT', 'Required data missing');
+  classicalDirect('DIRECT_CLASSICAL', 'Exact classical rule', 'सटीक शास्त्रीय नियम'),
+  classicalDerived('CLASSICAL_DERIVED', 'Direct calculation from a classical method', 'शास्त्रीय पद्धति से सीधी गणना'),
+  multiSourceConvergence('MULTI_SOURCE_CONVERGENCE', 'Several classical rules agree', 'कई शास्त्रीय नियम सहमत'),
+  configurableTradition('CONFIGURABLE_TRADITION', 'Depends on a configurable convention', 'परिवर्तनीय परंपरा पर निर्भर'),
+  systematicSynthesis('SYSTEMATIC_SYNTHESIS', 'Database synthesis, not a quoted classical rule', 'डेटाबेस संश्लेषण, उद्धृत शास्त्रीय नियम नहीं'),
+  engineeringHeuristic('ENGINEERING_HEURISTIC', 'Software heuristic for ranking or display; not a classical rule', 'क्रम या प्रदर्शन के लिए सॉफ़्टवेयर अनुमान; शास्त्रीय नियम नहीं'),
+  insufficientInput('INSUFFICIENT_INPUT', 'Required data missing', 'आवश्यक जानकारी नहीं');
 
   final String code;
-  final String label;
-  const SourceTier(this.code, this.label);
+  final String _en;
+  final String _hi;
+  const SourceTier(this.code, this._en, this._hi);
+
+  String get label => tr(_en, _hi);
 }
 
 enum Motion { direct, retrograde, stationary }
@@ -78,7 +82,7 @@ class GrahaRecord {
 
   bool get isNode => planet == 'rahu' || planet == 'ketu';
   bool get retrograde => motion == Motion.retrograde;
-  String get name => VedicMath.planets[planet]!.name;
+  String get name => L10n.planet(planet);
 
   Map<String, Object?> toJson() => {
         'graha': name,
@@ -429,15 +433,15 @@ class PrecisionMath {
     final checks = <QcCheck>[];
     final longs = c.planetLongitudes;
     final normalised = longs.values.every((l) => l >= 0 && l < 360) && c.ascendantSidereal >= 0 && c.ascendantSidereal < 360;
-    checks.add(QcCheck('QC1', 'All longitudes normalised to 0-360°', normalised, normalised ? 'OK' : 'A longitude is out of range'));
+    checks.add(QcCheck('QC1', tr('All longitudes normalised to 0-360°', 'सभी भोगांश 0-360° में'), normalised, normalised ? 'OK' : tr('A longitude is out of range', 'एक भोगांश सीमा से बाहर')));
 
     if (longs.containsKey('rahu') && longs.containsKey('ketu')) {
       final dev = (separation(longs['rahu']!, longs['ketu']!) - 180).abs();
-      checks.add(QcCheck('QC2', 'Rahu and Ketu exactly opposite', dev < 1e-6, 'Deviation ${dev.toStringAsExponential(1)}°'));
+      checks.add(QcCheck('QC2', tr('Rahu and Ketu exactly opposite', 'राहु और केतु ठीक आमने-सामने'), dev < 1e-6, '${tr('Deviation', 'विचलन')} ${dev.toStringAsExponential(1)}°'));
     }
 
     final lagnaOk = c.lagnaRashi == VedicMath.rashiIndex(c.ascendantSidereal);
-    checks.add(QcCheck('QC3', 'Ascendant and whole-sign houses consistent', lagnaOk, 'Lagna ${VedicMath.rashis[c.lagnaRashi].name}'));
+    checks.add(QcCheck('QC3', tr('Ascendant and whole-sign houses consistent', 'लग्न और राशि-भाव संगत'), lagnaOk, '${tr('Lagna', 'लग्न')} ${L10n.sign(c.lagnaRashi)}'));
 
     bool d1 = true;
     for (final e in longs.entries) {
@@ -445,20 +449,20 @@ class PrecisionMath {
       final abbr = Ephemeris.planetAbbreviations[e.key];
       if (abbr != null && !(c.housePlanets[house]?.contains(abbr) ?? false)) d1 = false;
     }
-    checks.add(QcCheck('QC4', 'D1 signs match raw longitudes', d1, d1 ? 'All planets placed in the sign of their longitude' : 'Mismatch'));
+    checks.add(QcCheck('QC4', tr('D1 signs match raw longitudes', 'D1 राशियाँ भोगांश से मेल खाती हैं'), d1, d1 ? tr('All planets placed in the sign of their longitude', 'सभी ग्रह अपने भोगांश की राशि में') : tr('Mismatch', 'असंगति')));
 
     final recs = records(c, cfg);
     final vargOk = recs.values.every((r) => r.vargottama == (r.navamsa == r.rashi) && r.navamsa == VedicMath.vargaRashi(r.longitude, 'D9', 9));
-    checks.add(QcCheck('QC5', 'D9 reproducible and Vargottama = (D1 sign = D9 sign)', vargOk, 'Navamsa rule: Parashari'));
+    checks.add(QcCheck('QC5', tr('D9 reproducible and Vargottama = (D1 sign = D9 sign)', 'D9 पुनरुत्पादनीय और वर्गोत्तम = (D1 राशि = D9 राशि)'), vargOk, tr('Navamsa rule: Parashari', 'नवांश नियम: पाराशरी')));
 
     final combOk = recs.values.every((r) => r.sunDistance == null || r.combustionOrb == null || r.combust == (r.sunDistance! < r.combustionOrb!));
-    checks.add(QcCheck('QC6', 'Combustion uses the stored Sun distance and orb table', combOk, 'Orb table: default (configurable)'));
+    checks.add(QcCheck('QC6', tr('Combustion uses the stored Sun distance and orb table', 'अस्त सूर्य दूरी और अंश तालिका से'), combOk, tr('Orb table: default (configurable)', 'अंश तालिका: डिफ़ॉल्ट (बदली जा सकती है)')));
 
     final warOk = wars(c, cfg).every((w) => warCandidates.contains(w.a) && warCandidates.contains(w.b));
-    checks.add(QcCheck('QC7', 'Graha Yuddha only for Mars, Mercury, Jupiter, Venus, Saturn', warOk, '${wars(c, cfg).length} war(s)'));
+    checks.add(QcCheck('QC7', tr('Graha Yuddha only for Mars, Mercury, Jupiter, Venus, Saturn', 'ग्रह युद्ध केवल मंगल, बुध, गुरु, शुक्र, शनि में'), warOk, tr('${wars(c, cfg).length} war(s)', '${wars(c, cfg).length} युद्ध')));
 
     final retroOk = recs.values.where((r) => !r.isNode).every((r) => r.retrograde == (r.speed < 0));
-    checks.add(QcCheck('QC8', 'Retrograde status from ephemeris speed', retroOk, 'Speeds from Swiss Ephemeris'));
+    checks.add(QcCheck('QC8', tr('Retrograde status from ephemeris speed', 'वक्री स्थिति एफ़ेमेरिस गति से'), retroOk, tr('Speeds from Swiss Ephemeris', 'गति स्विस एफ़ेमेरिस से')));
 
     if (longs.containsKey('moon')) {
       final dashas = DashaCalculations.compute(c.jd, longs['moon']!, utcOffset: c.utcOffset);
@@ -468,16 +472,16 @@ class PrecisionMath {
       final remainingFrac = 1 - (VedicMath.norm360(longs['moon']!) % nakSpan) / nakSpan;
       final expectedBalance = VedicMath.dashaYears[lord]! * remainingFrac;
       final balanceOk = first.lord == lord && ((first.endJD - c.jd) / DashaCalculations.yearDays - expectedBalance).abs() < 1e-3;
-      checks.add(QcCheck('QC9', 'Dasha balance reproduces from the Moon\'s nakshatra', balanceOk,
-          '${VedicMath.planets[lord]!.name} balance ${expectedBalance.toStringAsFixed(3)} years'));
+      checks.add(QcCheck('QC9', tr('Dasha balance reproduces from the Moon\'s nakshatra', 'दशा शेष चन्द्र नक्षत्र से पुनः प्राप्त'), balanceOk,
+          tr('${VedicMath.planets[lord]!.name} balance ${expectedBalance.toStringAsFixed(3)} years', '${L10n.planet(lord)} शेष ${expectedBalance.toStringAsFixed(3)} वर्ष')));
       final total = VedicMath.dashaYears.values.reduce((a, b) => a + b);
-      checks.add(QcCheck('QC10', 'Vimshottari Mahadasha years total 120', total == 120, '$total years'));
+      checks.add(QcCheck('QC10', tr('Vimshottari Mahadasha years total 120', 'विंशोत्तरी महादशा वर्षों का योग 120'), total == 120, tr('$total years', '$total वर्ष')));
       bool adOk = true;
       for (final md in dashas.mahadashas.skip(1).take(8)) {
         final sum = md.subPeriods.fold<double>(0, (s, d) => s + (d.endJD - d.startJD));
         if ((sum - (md.endJD - md.startJD)).abs() > 1e-6) adOk = false;
       }
-      checks.add(QcCheck('QC11', 'Antardasha durations sum to the Mahadasha', adOk, 'Checked 8 complete Mahadashas'));
+      checks.add(QcCheck('QC11', tr('Antardasha durations sum to the Mahadasha', 'अंतर्दशाओं का योग महादशा के बराबर'), adOk, tr('Checked 8 complete Mahadashas', '8 पूर्ण महादशाएँ जाँची गईं')));
     }
     return checks;
   }

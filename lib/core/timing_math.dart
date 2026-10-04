@@ -5,6 +5,7 @@ import 'package:crypto/crypto.dart';
 import 'calc_config.dart';
 import 'ephemeris.dart';
 import 'jaimini_math.dart';
+import 'l10n.dart';
 import 'precision_math.dart';
 import 'vedic_math.dart';
 
@@ -40,7 +41,9 @@ class TransitTrigger {
 
   static const Map<int, String> aspectCodes = {0: 'CONJUNCTION', 60: '3RD', 120: '5TH', 180: '7TH', 240: '9TH', 270: '10TH'};
   String get aspect => aspectCodes[angle] ?? '$angle';
-  String get aspectLabel => angle == 0 ? 'conjunction' : '${aspect.toLowerCase()}-house aspect';
+  String get aspectLabel => angle == 0
+      ? tr('conjunction', 'युति')
+      : tr('${aspect.toLowerCase()}-house aspect', '${aspect.replaceAll(RegExp('[A-Z]'), '')}वीं दृष्टि');
 
   String date(double jd) => VedicMath.jdToDate(jd + utcOffset / 24);
   String get enterDate => date(enterJd);
@@ -57,9 +60,13 @@ class TransitTrigger {
   /// Activation tag in the Volume 6 §92 style.
   String get tag => '${transit.toUpperCase()}_${angle == 0 ? 'TRANSIT' : '${aspect}_ASPECT'}_${target.code.replaceFirst('NATAL_', '').replaceFirst('BHAVA_', 'H')}';
 
-  String get summary => '${VedicMath.planets[transit]!.name} $aspectLabel to ${target.label}: '
-      '$enterDate → ${exactDates.isEmpty ? 'closest ${minOrb.toStringAsFixed(2)}°' : 'exact ${exactDates.join(', ')}'} → $exitDate'
-      '${recontact ? ' (retrograde re-contact)' : ''}';
+  String get summary => tr(
+      '${VedicMath.planets[transit]!.name} $aspectLabel to ${target.label}: '
+          '$enterDate → ${exactDates.isEmpty ? 'closest ${minOrb.toStringAsFixed(2)}°' : 'exact ${exactDates.join(', ')}'} → $exitDate'
+          '${recontact ? ' (retrograde re-contact)' : ''}',
+      '${L10n.planet(transit)} की ${target.label} पर $aspectLabel: '
+          '$enterDate → ${exactDates.isEmpty ? 'निकटतम ${minOrb.toStringAsFixed(2)}°' : 'सटीक ${exactDates.join(', ')}'} → $exitDate'
+          '${recontact ? ' (वक्री होकर दोबारा संपर्क)' : ''}');
 
   Map<String, dynamic> toJson() => {
         'transit': transit.toUpperCase(),
@@ -124,9 +131,11 @@ class TimingMath {
   /// Natal planets plus the twelve equal-house cusps from the Lagna degree.
   static List<TriggerTarget> natalTargets(ChartData c) => [
         for (final p in Ephemeris.planetOrder)
-          if (c.planetLongitudes.containsKey(p)) TriggerTarget('NATAL_${p.toUpperCase()}', 'natal ${VedicMath.planets[p]!.name}', c.planetLongitudes[p]!),
+          if (c.planetLongitudes.containsKey(p))
+            TriggerTarget('NATAL_${p.toUpperCase()}', tr('natal ${VedicMath.planets[p]!.name}', 'जन्म के ${L10n.planet(p)}'), c.planetLongitudes[p]!),
         for (int h = 1; h <= 12; h++)
-          TriggerTarget('BHAVA_$h', h == 1 ? 'the Lagna degree' : 'the ${VedicMath.ordinal(h)} cusp', VedicMath.norm360(c.ascendantSidereal + (h - 1) * 30)),
+          TriggerTarget('BHAVA_$h', h == 1 ? tr('the Lagna degree', 'लग्न अंश') : tr('the ${VedicMath.ordinal(h)} cusp', '$hवें भाव की संधि'),
+              VedicMath.norm360(c.ascendantSidereal + (h - 1) * 30)),
       ];
 
   /// Every pass of Jupiter, Saturn, Rahu and Ketu through the orb of an exact
@@ -198,23 +207,23 @@ class TimingMath {
   /// Factors compared across nearby birth times.
   static Map<String, String> sensitivityFactors(ChartData c, {int scheme = 8}) {
     final l = c.planetLongitudes;
-    String sign(int r) => VedicMath.rashis[r].name;
+    String sign(int r) => L10n.sign(r);
     String varga(String key, int div) => sign(VedicMath.vargaRashi(c.ascendantSidereal, key, div));
     final dashas = DashaCalculations.compute(c.jd, l['moon']!, utcOffset: c.utcOffset);
     final first = dashas.mahadashas.first;
     final ak = JaiminiMath.karakas(c, scheme: scheme).first.planet;
     return {
-      'Lagna sign': sign(c.lagnaRashi),
-      'Moon sign': sign(VedicMath.rashiIndex(l['moon']!)),
-      'Sun sign': sign(VedicMath.rashiIndex(l['sun']!)),
-      'Moon nakshatra': VedicMath.nakshatras[VedicMath.nakshatraIndex(l['moon']!)].name,
-      'Planet houses': [for (final p in Ephemeris.planetOrder) VedicMath.houseOf(VedicMath.rashiIndex(l[p]!), c.lagnaRashi)].join(','),
-      'D9 Lagna': varga('D9', 9),
-      'D10 Lagna': varga('D10', 10),
-      'D60 Lagna': varga('D60', 60),
-      'Daśā balance': '${first.lord} ${((first.endJD - c.jd) / DashaCalculations.yearDays).toStringAsFixed(1)} y',
-      'Mahādaśā boundaries': [for (final m in dashas.mahadashas.skip(1).take(3)) m.startDate].join(', '),
-      'Ātmakāraka': ak,
+      tr('Lagna sign', 'लग्न राशि'): sign(c.lagnaRashi),
+      tr('Moon sign', 'चन्द्र राशि'): sign(VedicMath.rashiIndex(l['moon']!)),
+      tr('Sun sign', 'सूर्य राशि'): sign(VedicMath.rashiIndex(l['sun']!)),
+      tr('Moon nakshatra', 'चन्द्र नक्षत्र'): L10n.nakshatra(VedicMath.nakshatraIndex(l['moon']!)),
+      tr('Planet houses', 'ग्रहों के भाव'): [for (final p in Ephemeris.planetOrder) VedicMath.houseOf(VedicMath.rashiIndex(l[p]!), c.lagnaRashi)].join(','),
+      tr('D9 Lagna', 'D9 लग्न'): varga('D9', 9),
+      tr('D10 Lagna', 'D10 लग्न'): varga('D10', 10),
+      tr('D60 Lagna', 'D60 लग्न'): varga('D60', 60),
+      tr('Daśā balance', 'दशा शेष'): '${L10n.planet(first.lord)} ${((first.endJD - c.jd) / DashaCalculations.yearDays).toStringAsFixed(1)} ${tr('y', 'व')}',
+      tr('Mahādaśā boundaries', 'महादशा सीमाएँ'): [for (final m in dashas.mahadashas.skip(1).take(3)) m.startDate].join(', '),
+      tr('Ātmakāraka', 'आत्मकारक'): L10n.planet(ak),
     };
   }
 

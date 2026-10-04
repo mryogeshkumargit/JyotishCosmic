@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../services/sync_service.dart';
 import 'database_provider.dart';
+import '../core/l10n.dart';
 
 /// Keys in secure storage.
 const _kToken = 'jwt_token';
@@ -138,10 +139,11 @@ class SyncController extends Notifier<SyncState> {
       final status = e.response?.statusCode;
       final data = e.response?.data;
       final msg = data is Map ? (data['error'] ?? data['message']) : null;
-      if (msg != null) return '$action failed: $msg';
-      if (status == 401 || status == 403) return '$action failed: wrong email or password';
-      if (status != null) return '$action failed (HTTP $status)';
-      return '$action failed: cannot reach ${state.serverUrl}';
+      final failed = tr('failed', 'विफल');
+      if (msg != null) return '$action $failed: $msg';
+      if (status == 401 || status == 403) return '$action $failed: ${tr('wrong email or password', 'गलत ईमेल या पासवर्ड')}';
+      if (status != null) return '$action $failed (HTTP $status)';
+      return '$action $failed: ${tr('cannot reach', 'पहुँच नहीं सके')} ${state.serverUrl}';
     }
     return '$action failed: $e';
   }
@@ -157,7 +159,7 @@ class SyncController extends Notifier<SyncState> {
       await _onSignedIn(email.trim(), token);
       return true;
     } catch (e) {
-      state = state.copyWith(busy: false, error: _authError(e, 'Sign in'));
+      state = state.copyWith(busy: false, error: _authError(e, tr('Sign in', 'साइन इन')));
       return false;
     }
   }
@@ -174,7 +176,7 @@ class SyncController extends Notifier<SyncState> {
         return true;
       }
     } catch (e) {
-      state = state.copyWith(busy: false, error: _authError(e, 'Registration'));
+      state = state.copyWith(busy: false, error: _authError(e, tr('Registration', 'पंजीकरण')));
       return false;
     }
     // Some servers only create the account; sign in explicitly.
@@ -235,7 +237,7 @@ class SyncController extends Notifier<SyncState> {
         state = state.copyWith(busy: false, error: e.message);
       }
     } catch (e) {
-      state = state.copyWith(busy: false, error: 'Sync failed: $e');
+      state = state.copyWith(busy: false, error: '${tr('Sync failed', 'सिंक विफल')}: $e');
     }
   }
 }

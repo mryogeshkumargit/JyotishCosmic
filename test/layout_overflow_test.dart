@@ -19,6 +19,7 @@ import 'package:mobile_jyotish/screens/rules_sources_screen.dart';
 import 'package:mobile_jyotish/screens/settings_screen.dart';
 import 'package:mobile_jyotish/screens/tabs/synthesis_screen.dart';
 import 'package:mobile_jyotish/core/ephemeris.dart';
+import 'package:mobile_jyotish/core/l10n.dart';
 import 'package:mobile_jyotish/core/synthesis_engine.dart';
 import 'package:mobile_jyotish/theme/app_theme.dart';
 import 'package:mobile_jyotish/widgets/yoga_guide_view.dart';
@@ -88,11 +89,23 @@ void main() {
     return db;
   }
 
-  for (final size in sizes) {
-    for (final scale in scales) {
-      final tag = '${size.width.toInt()}x${size.height.toInt()} @${scale}x';
+  // English on every size and scale; Hindi (usually longer labels) on the smallest phone.
+  final variants = [
+    for (final size in sizes)
+      for (final scale in scales) ('en', size, scale),
+    for (final scale in scales) ('hi', sizes.last, scale),
+  ];
+
+  for (final (lang, size, scale) in variants) {
+    {
+      final tag = '${size.width.toInt()}x${size.height.toInt()} @${scale}x${lang == 'hi' ? ' (Hindi)' : ''}';
+      void useLanguage() {
+        L10n.lang = lang;
+        addTearDown(() => L10n.lang = 'en');
+      }
 
       testWidgets('top-level screens fit $tag', (tester) async {
+        useLanguage();
         await tester.binding.setSurfaceSize(size);
         addTearDown(() => tester.binding.setSurfaceSize(null));
         final db = await seeded(tester);
@@ -114,19 +127,19 @@ void main() {
             await tester.pumpWidget(app(e.value, db, scale));
             await settle(tester);
             if (e.key == 'settings') {
-              for (final t in ['AI', 'Sync', 'About']) {
+              for (final t in ['AI', tr('Sync', 'सिंक'), tr('About', 'परिचय')]) {
                 await tester.tap(find.text(t));
                 await settle(tester);
               }
             }
             if (e.key == 'rules & sources') {
-              for (final t in ['Sources', 'Coverage']) {
+              for (final t in [tr('Sources', 'स्रोत'), tr('Coverage', 'कवरेज')]) {
                 await tester.tap(find.text(t));
                 await settle(tester);
               }
             }
             if (e.key == 'research' && swephSkipReason() == null) {
-              final search = find.text('Search saved charts');
+              final search = find.text(tr('Search saved charts', 'सहेजी गई कुंडलियाँ खोजें'));
               await tester.scrollUntilVisible(search, 200, scrollable: find.byType(Scrollable).first);
               await tester.tap(search);
               await settle(tester);
@@ -134,7 +147,7 @@ void main() {
               await settle(tester);
             }
             if (e.key == 'dashboard') {
-              await tester.tap(find.text('Ask AI'));
+              await tester.tap(find.text(tr('Ask AI', 'AI से पूछें')));
               await settle(tester);
             }
           });
@@ -159,6 +172,7 @@ void main() {
       });
 
       testWidgets('synthesis domain details fit $tag', (tester) async {
+        useLanguage();
         await tester.binding.setSurfaceSize(size);
         addTearDown(() => tester.binding.setSurfaceSize(null));
         final db = AppDatabase.forTesting(NativeDatabase.memory());
@@ -183,6 +197,7 @@ void main() {
       }, skip: swephSkipReason() != null);
 
       testWidgets('chart features fit $tag', (tester) async {
+        useLanguage();
         await tester.binding.setSurfaceSize(size);
         addTearDown(() => tester.binding.setSurfaceSize(null));
         final db = AppDatabase.forTesting(NativeDatabase.memory());
@@ -211,7 +226,7 @@ void main() {
             .map((m) => 'result: $m'));
         for (final f in features) {
           final errors = await collect(tester, () async {
-            final target = find.text(f).first;
+            final target = find.text(L10n.hi ? (KundliResultScreen.hindiTitles[f] ?? f) : f).first;
             await tester.scrollUntilVisible(target, 200, scrollable: find.byType(Scrollable).first);
             await tester.tap(target);
             await settle(tester);
@@ -224,7 +239,9 @@ void main() {
             if (f == 'Synthesis') {
               await tester.tap(tabs.at(0), warnIfMissed: false);
               await settle(tester);
-              await tester.tap(find.text('Jaimini karakas & Arudhas'));
+              final jaimini = find.text(tr('Jaimini karakas & Arudhas', 'जैमिनी कारक और आरूढ़'));
+              await tester.scrollUntilVisible(jaimini, 200, scrollable: find.byType(Scrollable).last);
+              await tester.tap(jaimini);
               await settle(tester);
             }
           });

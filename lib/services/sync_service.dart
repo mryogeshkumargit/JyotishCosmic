@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart';
 import '../core/database.dart';
+import '../core/l10n.dart';
 
 class SyncException implements Exception {
   final String message;
@@ -81,10 +82,10 @@ class SyncService {
   SyncException _error(DioException e, String action) {
     final status = e.response?.statusCode;
     if (status == 401 || status == 403) {
-      return SyncException('Session expired. Please sign in again.', unauthorized: true);
+      return SyncException(tr('Session expired. Please sign in again.', 'सत्र समाप्त हो गया। कृपया फिर से साइन इन करें।'), unauthorized: true);
     }
-    if (status != null) return SyncException('$action failed (HTTP $status)');
-    return SyncException('$action failed: cannot reach the sync server');
+    if (status != null) return SyncException('$action ${tr('failed', 'विफल')} (HTTP $status)');
+    return SyncException('$action ${tr('failed: cannot reach the sync server', 'विफल: सिंक सर्वर तक नहीं पहुँच सके')}');
   }
 
   /// Uploads local changes, sends pending deletions, then downloads remote profiles.
@@ -108,7 +109,7 @@ class SyncService {
           // Already gone on the server.
           await (_db.delete(_db.pendingDeletions)..where((t) => t.cloudId.equals(d.cloudId))).go();
         } else {
-          final err = _error(e, 'Delete');
+          final err = _error(e, tr('Delete', 'हटाना'));
           if (err.unauthorized) throw err;
           // Keep the tombstone: it is retried next time and stops the profile reappearing.
           errors.add(err.message);
@@ -155,7 +156,7 @@ class SyncService {
         await (_db.update(_db.profiles)..where((t) => t.id.equals(p.id))).write(ProfilesCompanion(cloudflareId: Value(cloudId)));
         count++;
       } on DioException catch (e) {
-        final err = _error(e, 'Upload of ${p.name}');
+        final err = _error(e, tr('Upload of ${p.name}', '${p.name} का अपलोड'));
         if (err.unauthorized) throw err;
         errors.add(err.message);
       }
@@ -168,7 +169,7 @@ class SyncService {
     try {
       response = await _api.get('/api/profiles');
     } on DioException catch (e) {
-      throw _error(e, 'Download');
+      throw _error(e, tr('Download', 'डाउनलोड'));
     }
     final data = response.data;
     final List remote = data is List ? data : (data is Map && data['profiles'] is List ? data['profiles'] : const []);

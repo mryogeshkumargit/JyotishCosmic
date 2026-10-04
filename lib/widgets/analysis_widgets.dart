@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/l10n.dart';
 
 /// Card with a title used by the analysis screens.
 class SectionCard extends StatelessWidget {
@@ -184,5 +185,43 @@ class RatioBar extends StatelessWidget {
         ]),
       );
     });
+  }
+}
+
+/// "In simple words" box with a plain-language explanation.
+class SimpleMeaningCard extends StatelessWidget {
+  final List<String> paragraphs;
+  final String? title;
+  final bool card;
+  const SimpleMeaningCard(this.paragraphs, {super.key, this.title, this.card = true});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final body = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        Icon(Icons.lightbulb_outline, size: 18, color: scheme.primary),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(title ?? tr('In simple words', 'आसान भाषा में'),
+              style: TextStyle(color: scheme.primary, fontWeight: FontWeight.bold, fontSize: 14)),
+        ),
+      ]),
+      const SizedBox(height: 6),
+      for (final p in paragraphs)
+        Padding(padding: const EdgeInsets.only(bottom: 6), child: Text(p, style: const TextStyle(fontSize: 13.5, height: 1.45))),
+    ]);
+    if (!card) return body;
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: scheme.primaryContainer.withValues(alpha: 0.25),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: scheme.primary.withValues(alpha: 0.35)),
+      ),
+      child: body,
+    );
   }
 }

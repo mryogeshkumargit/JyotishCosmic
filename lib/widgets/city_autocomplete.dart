@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/location_service.dart';
+import '../core/l10n.dart';
 
 /// Place-of-birth search over the bundled (offline) city database.
 class CityAutocomplete extends StatefulWidget {
@@ -95,8 +96,8 @@ class _CityAutocompleteState extends State<CityAutocomplete> {
           onChanged: _onSearchChanged,
           style: TextStyle(color: scheme.onSurface),
           decoration: InputDecoration(
-            labelText: 'Place of Birth',
-            hintText: 'Start typing a city name...',
+            labelText: tr('Place of Birth', 'जन्म स्थान'),
+            hintText: tr('Start typing a city name...', 'शहर का नाम लिखना शुरू करें...'),
             prefixIcon: Icon(Icons.location_city, color: scheme.secondary),
             suffixIcon: _isLoading
                 ? Container(
@@ -111,7 +112,7 @@ class _CityAutocompleteState extends State<CityAutocomplete> {
         if (_showDropdown && !_isLoading && _options.isEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 8, left: 12),
-            child: Text('No matching city. You can enter coordinates manually below.',
+            child: Text(tr('No matching city. You can enter coordinates manually below.', 'कोई शहर नहीं मिला। आप नीचे अक्षांश-देशांतर स्वयं लिख सकते हैं।'),
                 style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12)),
           ),
         if (_showDropdown && _options.isNotEmpty) ...[

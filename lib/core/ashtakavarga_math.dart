@@ -1,4 +1,5 @@
 import 'ephemeris.dart';
+import 'l10n.dart';
 import 'vedic_math.dart';
 
 /// Bhinnashtakavarga of one planet: bindus in each sign (0 = Aries).
@@ -193,7 +194,8 @@ class AshtakavargaMath {
     if (!av.bhinna.containsKey(planet)) return 'n/a';
     final b = av.bindusFor(planet, rashi);
     final s = av.sarva[rashi];
-    final q = b >= 5 ? 'strong' : (b == 4 ? 'average' : 'weak');
-    return '$b bindus in its own Ashtakavarga ($q); Sarvashtakavarga $s${s >= 28 ? ' (above average)' : ' (below 28)'}';
+    final q = b >= 5 ? tr('strong', 'प्रबल') : (b == 4 ? tr('average', 'औसत') : tr('weak', 'कमज़ोर'));
+    return tr('$b bindus in its own Ashtakavarga ($q); Sarvashtakavarga $s${s >= 28 ? ' (above average)' : ' (below 28)'}',
+        'अपने अष्टकवर्ग में $b बिंदु ($q); सर्वाष्टकवर्ग $s${s >= 28 ? ' (औसत से अधिक)' : ' (28 से कम)'}');
   }
 }

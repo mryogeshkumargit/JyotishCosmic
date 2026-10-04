@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
+import '../core/l10n.dart';
 
 /// The bundled "Comprehensive Guide to Yogas" (assets/docs/vedic_yogas_guide.md).
 class YogaGuideView extends StatelessWidget {
@@ -30,7 +31,7 @@ class _MarkdownDocViewState extends State<MarkdownDocView> {
     return FutureBuilder<String>(
       future: _text,
       builder: (context, snapshot) {
-        if (snapshot.hasError) return Center(child: Text('Could not open the document: ${snapshot.error}'));
+        if (snapshot.hasError) return Center(child: Text('${tr('Could not open the document', 'दस्तावेज़ नहीं खुल सका')}: ${snapshot.error}'));
         if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
         return Markdown(
           data: snapshot.data!,

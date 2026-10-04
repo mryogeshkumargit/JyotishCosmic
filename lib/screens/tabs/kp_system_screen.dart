@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import '../../core/ephemeris.dart';
 import '../../core/kp_math.dart';
 import '../../core/vedic_math.dart';
+import '../../core/l10n.dart';
+import '../../core/plain/meanings.dart';
+import '../../widgets/analysis_widgets.dart';
 
 class KPSystemScreen extends StatefulWidget {
   final ChartData chartData;
@@ -28,23 +31,27 @@ class _KPSystemScreenState extends State<KPSystemScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('KP System')),
+      appBar: AppBar(title: Text(tr('KP System', 'केपी पद्धति'))),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Krishnamurti ayanamsa: ${kpAyanamsa.toStringAsFixed(4)}°', style: const TextStyle(color: Colors.grey)),
+            Text('${tr('Krishnamurti ayanamsa', 'कृष्णमूर्ति अयनांश')}: ${kpAyanamsa.toStringAsFixed(4)}°', style: const TextStyle(color: Colors.grey)),
             const SizedBox(height: 12),
-            const Text('Planetary Details', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            SimpleMeaningCard([
+              tr('The KP (Krishnamurti Paddhati) system divides each nakshatra into unequal parts ruled by the Vimshottari lords. For every planet and house cusp, the star lord shows the source or nature of results, and the sub lord decides whether the matter succeeds.',
+                  'केपी (कृष्णमूर्ति पद्धति) हर नक्षत्र को विंशोत्तरी स्वामियों के असमान भागों में बाँटती है। हर ग्रह और भाव संधि के लिए नक्षत्र स्वामी फल का स्रोत या प्रकृति बताता है और उप-स्वामी तय करता है कि मामला सफल होगा या नहीं।'),
+            ]),
+            Text(tr('Planetary Details', 'ग्रह विवरण'), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             DefaultTextStyle.merge(style: const TextStyle(fontSize: 13), child: _buildPlanetTable()),
             const SizedBox(height: 24),
-            const Text('Placidus House Cusps', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            Text(tr('Placidus House Cusps', 'प्लेसिडस भाव संधियाँ'), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             DefaultTextStyle.merge(style: const TextStyle(fontSize: 13), child: _buildCuspTable()),
             const SizedBox(height: 24),
-            const Text('KP Interpretations (Sub-Lords)', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            Text(tr('KP Interpretations (Sub-Lords)', 'केपी फलादेश (उप-स्वामी)'), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             _buildInterpretations(),
           ],
@@ -53,7 +60,6 @@ class _KPSystemScreenState extends State<KPSystemScreen> {
     );
   }
 
-  static String _short(String rashi) => rashi.length > 3 ? rashi.substring(0, 3) : rashi;
 
   Widget _buildPlanetTable() {
     return Table(
@@ -66,23 +72,21 @@ class _KPSystemScreenState extends State<KPSystemScreen> {
         3: FlexColumnWidth(2),
       },
       children: [
-        const TableRow(
-          decoration: BoxDecoration(color: Colors.black12),
+        TableRow(
+          decoration: const BoxDecoration(color: Colors.black12),
           children: [
-            Padding(padding: EdgeInsets.all(6.0), child: Text('Planet', style: TextStyle(fontWeight: FontWeight.bold))),
-            Padding(padding: EdgeInsets.all(6.0), child: Text('Sign', style: TextStyle(fontWeight: FontWeight.bold))),
-            Padding(padding: EdgeInsets.all(6.0), child: Text('Star Lord', style: TextStyle(fontWeight: FontWeight.bold))),
-            Padding(padding: EdgeInsets.all(6.0), child: Text('Sub Lord', style: TextStyle(fontWeight: FontWeight.bold))),
+            for (final h in [tr('Planet', 'ग्रह'), tr('Sign', 'राशि'), tr('Star Lord', 'नक्षत्र स्वामी'), tr('Sub Lord', 'उप-स्वामी')])
+              Padding(padding: const EdgeInsets.all(6.0), child: Text(h, style: const TextStyle(fontWeight: FontWeight.bold))),
           ],
         ),
         ...Ephemeris.planetOrder.where(kpPlanets.containsKey).map((p) {
                     var data = kpPlanets[p]!;
           return TableRow(
             children: [
-              Padding(padding: const EdgeInsets.all(6.0), child: Text(VedicMath.planets[p]!.name)),
-              Padding(padding: const EdgeInsets.all(6.0), child: Text('${_short(data.rashi)} ${VedicMath.formatDegree(data.longitude)}')),
-              Padding(padding: const EdgeInsets.all(6.0), child: Text(VedicMath.capitalize(data.nakshatraLord))),
-              Padding(padding: const EdgeInsets.all(6.0), child: Text(VedicMath.capitalize(data.subLord))),
+              Padding(padding: const EdgeInsets.all(6.0), child: Text(L10n.planet(p))),
+              Padding(padding: const EdgeInsets.all(6.0), child: Text('${L10n.signShort(VedicMath.rashiIndex(data.longitude))} ${VedicMath.formatDegree(data.longitude)}')),
+              Padding(padding: const EdgeInsets.all(6.0), child: Text(L10n.planet(data.nakshatraLord))),
+              Padding(padding: const EdgeInsets.all(6.0), child: Text(L10n.planet(data.subLord))),
             ],
           );
         }),
@@ -101,22 +105,20 @@ class _KPSystemScreenState extends State<KPSystemScreen> {
         3: FlexColumnWidth(2),
       },
       children: [
-        const TableRow(
-          decoration: BoxDecoration(color: Colors.black12),
+        TableRow(
+          decoration: const BoxDecoration(color: Colors.black12),
           children: [
-            Padding(padding: EdgeInsets.all(6.0), child: Text('#', style: TextStyle(fontWeight: FontWeight.bold))),
-            Padding(padding: EdgeInsets.all(6.0), child: Text('Sign', style: TextStyle(fontWeight: FontWeight.bold))),
-            Padding(padding: EdgeInsets.all(6.0), child: Text('Star Lord', style: TextStyle(fontWeight: FontWeight.bold))),
-            Padding(padding: EdgeInsets.all(6.0), child: Text('Sub Lord', style: TextStyle(fontWeight: FontWeight.bold))),
+            for (final h in ['#', tr('Sign', 'राशि'), tr('Star Lord', 'नक्षत्र स्वामी'), tr('Sub Lord', 'उप-स्वामी')])
+              Padding(padding: const EdgeInsets.all(6.0), child: Text(h, style: const TextStyle(fontWeight: FontWeight.bold))),
           ],
         ),
         ...kpCusps.map((c) {
           return TableRow(
             children: [
               Padding(padding: const EdgeInsets.all(6.0), child: Text(c.cuspNumber.toString())),
-              Padding(padding: const EdgeInsets.all(6.0), child: Text('${_short(c.rashi)} ${VedicMath.formatDegree(c.longitude)}')),
-              Padding(padding: const EdgeInsets.all(6.0), child: Text(VedicMath.capitalize(c.nakshatraLord))),
-              Padding(padding: const EdgeInsets.all(6.0), child: Text(VedicMath.capitalize(c.subLord))),
+              Padding(padding: const EdgeInsets.all(6.0), child: Text('${L10n.signShort(VedicMath.rashiIndex(c.longitude))} ${VedicMath.formatDegree(c.longitude)}')),
+              Padding(padding: const EdgeInsets.all(6.0), child: Text(L10n.planet(c.nakshatraLord))),
+              Padding(padding: const EdgeInsets.all(6.0), child: Text(L10n.planet(c.subLord))),
             ],
           );
         }),
@@ -125,20 +127,7 @@ class _KPSystemScreenState extends State<KPSystemScreen> {
   }
 
   Widget _buildInterpretations() {
-    final Map<int, String> houseMeanings = {
-      1: 'Self, health, and vitality',
-      2: 'Wealth, family, and speech',
-      3: 'Courage, siblings, and communication',
-      4: 'Mother, property, and happiness',
-      5: 'Children, intellect, and speculation',
-      6: 'Disease, debt, and enemies',
-      7: 'Marriage, partnerships, and business',
-      8: 'Longevity, sudden events, and inheritance',
-      9: 'Luck, religion, and higher education',
-      10: 'Profession, karma, and status',
-      11: 'Gains, fulfillment of desires, and friends',
-      12: 'Losses, foreign travels, and spirituality'
-    };
+    final Map<int, String> houseMeanings = {for (int h = 1; h <= 12; h++) h: Meanings.house(h)};
 
     return ListView.builder(
       physics: const NeverScrollableScrollPhysics(),
@@ -156,14 +145,18 @@ class _KPSystemScreenState extends State<KPSystemScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Cusp ${c.cuspNumber}: $meaning',
+                  '${tr('Cusp', 'भाव संधि')} ${c.cuspNumber}: $meaning',
                   style: TextStyle(color: Theme.of(context).colorScheme.secondary, fontWeight: FontWeight.bold, fontSize: 16),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'The sub-lord of the ${c.cuspNumber} cusp is ${c.subLord.toUpperCase()}, placed in the star of ${c.nakshatraLord.toUpperCase()}. '
-                  'In KP System, the sub-lord dictates the success or failure of the house matters, while the star lord shows the source or nature of the results. '
-                  'Thus, matters of $meaning will be heavily influenced by the dignity and significations of ${c.subLord.toUpperCase()} and ${c.nakshatraLord.toUpperCase()} in this chart.',
+                  tr(
+                      'The sub-lord of the ${c.cuspNumber} cusp is ${L10n.planet(c.subLord)}, placed in the star of ${L10n.planet(c.nakshatraLord)}. '
+                          'In KP System, the sub-lord dictates the success or failure of the house matters, while the star lord shows the source or nature of the results. '
+                          'Thus, matters of $meaning will be heavily influenced by the dignity and significations of ${L10n.planet(c.subLord)} and ${L10n.planet(c.nakshatraLord)} in this chart.',
+                      '${c.cuspNumber}वीं भाव संधि का उप-स्वामी ${L10n.planet(c.subLord)} है, जो ${L10n.planet(c.nakshatraLord)} के नक्षत्र में है। '
+                          'केपी पद्धति में उप-स्वामी भाव के विषयों की सफलता या असफलता तय करता है, जबकि नक्षत्र स्वामी फल का स्रोत या प्रकृति बताता है। '
+                          'इसलिए $meaning के विषय इस कुंडली में ${L10n.planet(c.subLord)} और ${L10n.planet(c.nakshatraLord)} की स्थिति और कारकत्व से बहुत प्रभावित होंगे।'),
                   style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8), height: 1.4),
                 ),
               ],

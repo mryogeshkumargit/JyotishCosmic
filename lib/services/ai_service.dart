@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../providers/settings_provider.dart';
+import '../core/l10n.dart';
 
 class AiException implements Exception {
   final String message;
@@ -56,17 +57,17 @@ class AiService {
           ? await _anthropic(client, config, system, messages, onPartial)
           : await _openAiCompatible(client, config, system, messages, onPartial);
       if (text.trim().isEmpty) {
-        throw AiException('The AI provider returned an empty response. Check the model name in Settings > AI.');
+        throw AiException(tr('The AI provider returned an empty response. Check the model name in Settings > AI.', 'AI प्रदाता ने खाली उत्तर दिया। सेटिंग्स > AI में मॉडल का नाम जाँचें।'));
       }
       return text;
     } on AiException {
       rethrow;
     } on TimeoutException {
-      throw AiException('The AI provider stopped responding. Please try again, or pick a faster model in Settings > AI.');
+      throw AiException(tr('The AI provider stopped responding. Please try again, or pick a faster model in Settings > AI.', 'AI प्रदाता ने उत्तर देना बंद कर दिया (stopped responding)। फिर से कोशिश करें, या सेटिंग्स > AI में तेज़ मॉडल चुनें।'));
     } on FormatException catch (e) {
-      throw AiException('Unexpected response from the AI provider: ${e.message}');
+      throw AiException('${tr('Unexpected response from the AI provider', 'AI प्रदाता से अप्रत्याशित उत्तर')}: ${e.message}');
     } catch (e) {
-      throw AiException('Could not reach the AI provider. Check your internet connection and the API endpoint.\n($e)');
+      throw AiException('${tr('Could not reach the AI provider. Check your internet connection and the API endpoint.', 'AI प्रदाता तक नहीं पहुँच सके। इंटरनेट कनेक्शन और API एंडपॉइंट जाँचें।')}\n($e)');
     } finally {
       client.close();
     }
@@ -74,16 +75,16 @@ class AiService {
 
   static void _checkConfig(SettingsState config) {
     if (config.llmProvider != 'Custom' && config.apiKey.trim().isEmpty) {
-      throw AiException('API key is not configured. Please enter it in Settings > AI.');
+      throw AiException(tr('API key is not configured. Please enter it in Settings > AI.', 'API कुंजी सेट नहीं है। कृपया सेटिंग्स > AI में दर्ज करें।'));
     }
     if (config.apiEndpoint.trim().isEmpty) {
-      throw AiException('API endpoint is not configured. Please set it in Settings > AI.');
+      throw AiException(tr('API endpoint is not configured. Please set it in Settings > AI.', 'API एंडपॉइंट सेट नहीं है। कृपया सेटिंग्स > AI में सेट करें।'));
     }
     if (config.modelName.trim().isEmpty) {
-      throw AiException('No model selected. Please choose one in Settings > AI.');
+      throw AiException(tr('No model selected. Please choose one in Settings > AI.', 'कोई मॉडल चुना नहीं गया। कृपया सेटिंग्स > AI में चुनें।'));
     }
     if (Uri.tryParse(config.apiEndpoint.trim())?.hasScheme != true) {
-      throw AiException('The API endpoint is not a valid URL.');
+      throw AiException(tr('The API endpoint is not a valid URL.', 'API एंडपॉइंट सही URL नहीं है।'));
     }
   }
 
@@ -140,7 +141,7 @@ class AiService {
       if (choice is Map && choice['finish_reason'] is String) finishReason = choice['finish_reason'];
     }
     if (buffer.isEmpty && finishReason == 'content_filter') {
-      throw AiException('The provider blocked this response (content filter).');
+      throw AiException(tr('The provider blocked this response (content filter).', 'प्रदाता ने यह उत्तर रोक दिया (कंटेंट फ़िल्टर)।'));
     }
     return buffer.toString();
   }
@@ -178,7 +179,7 @@ class AiService {
 
     if (!_isEventStream(response)) {
       final data = _decodeJson(await _readBody(response));
-      if (data['stop_reason'] == 'refusal') throw AiException('The model declined to answer this request.');
+      if (data['stop_reason'] == 'refusal') throw AiException(tr('The model declined to answer this request.', 'मॉडल ने इस अनुरोध का उत्तर देने से मना कर दिया।'));
       final content = data['content'];
       return content is List
           ? content.where((b) => b is Map && b['type'] == 'text').map((b) => b['text'] as String).join('\n')
@@ -198,7 +199,7 @@ class AiService {
           }
         case 'message_delta':
           if (json['delta'] is Map && json['delta']['stop_reason'] == 'refusal' && buffer.isEmpty) {
-            throw AiException('The model declined to answer this request.');
+            throw AiException(tr('The model declined to answer this request.', 'मॉडल ने इस अनुरोध का उत्तर देने से मना कर दिया।'));
           }
         case 'error':
           throw AiException('API error: ${_errorMessage(json)}');
@@ -228,9 +229,9 @@ class AiService {
     }
     if (detail.length > 400) detail = '${detail.substring(0, 400)}…';
     final hint = switch (response.statusCode) {
-      401 || 403 => ' (check the API key)',
-      404 => ' (check the endpoint URL and the model name)',
-      429 => ' (rate limit or no credits left on this account)',
+      401 || 403 => tr(' (check the API key)', ' (API कुंजी जाँचें)'),
+      404 => tr(' (check the endpoint URL and the model name)', ' (एंडपॉइंट URL और मॉडल का नाम जाँचें)'),
+      429 => tr(' (rate limit or no credits left on this account)', ' (सीमा पार हो गई या खाते में क्रेडिट नहीं बचे)'),
       _ => '',
     };
     throw AiException('API error ${response.statusCode}$hint: $detail');
@@ -254,7 +255,7 @@ class AiService {
 
   static Map<String, dynamic> _decodeJson(String body) {
     final v = _tryJson(body);
-    if (v == null) throw AiException('Unexpected response from the AI provider.');
+    if (v == null) throw AiException(tr('Unexpected response from the AI provider.', 'AI प्रदाता से अप्रत्याशित उत्तर।'));
     return v;
   }
 
@@ -294,17 +295,17 @@ class AiService {
   /// with embedding/image/audio models filtered out.
   static Future<List<String>> listModels(SettingsState config) async {
     if (config.llmProvider != 'Custom' && config.apiKey.trim().isEmpty) {
-      throw AiException('Enter your API key first to load the models available to your account.');
+      throw AiException(tr('Enter your API key first to load the models available to your account.', 'अपने खाते के मॉडल देखने के लिए पहले API कुंजी दर्ज करें।'));
     }
     final uri = modelsUri(config.llmProvider, config.apiEndpoint.trim());
-    if (uri == null) throw AiException('Cannot work out the models URL from the API endpoint.');
+    if (uri == null) throw AiException(tr('Cannot work out the models URL from the API endpoint.', 'API एंडपॉइंट से मॉडल सूची का URL नहीं बन सका।'));
     final client = clientFactory();
     try {
       final headers = config.llmProvider == 'Anthropic' ? _anthropicHeaders(config) : _openAiHeaders(config);
       final response = await client.get(uri, headers: headers).timeout(const Duration(seconds: 30));
       if (response.statusCode != 200) {
         final json = _tryJson(utf8.decode(response.bodyBytes));
-        throw AiException('Could not load models (HTTP ${response.statusCode})'
+        throw AiException('${tr('Could not load models', 'मॉडल लोड नहीं हो सके')} (HTTP ${response.statusCode})'
             '${json != null ? ': ${_errorMessage(json)}' : ''}');
       }
       final json = _decodeJson(utf8.decode(response.bodyBytes));
@@ -326,9 +327,9 @@ class AiService {
     } on AiException {
       rethrow;
     } on TimeoutException {
-      throw AiException('The provider did not answer in time while loading models.');
+      throw AiException(tr('The provider did not answer in time while loading models.', 'मॉडल लोड करते समय प्रदाता ने समय पर उत्तर नहीं दिया।'));
     } catch (e) {
-      throw AiException('Could not load models: $e');
+      throw AiException('${tr('Could not load models', 'मॉडल लोड नहीं हो सके')}: $e');
     } finally {
       client.close();
     }
