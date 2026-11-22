@@ -9,6 +9,7 @@ import '../providers/profile_provider.dart';
 import '../providers/settings_provider.dart';
 import '../services/ai_service.dart';
 import '../widgets/ai_sheet.dart';
+import 'daily_rashifal_screen.dart';
 import '../core/l10n.dart';
 
 class RashifalScreen extends ConsumerStatefulWidget {
@@ -41,7 +42,8 @@ class _RashifalScreenState extends ConsumerState<RashifalScreen> {
       final transits = TransitMath.compute(chartData);
       final today = DateTime.now();
 
-      final prompt = 'Today is ${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}. '
+      final prompt =
+          'Today is ${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}. '
           'Generate a Vedic $timeFrame horoscope (Rashifal) for a person whose Moon sign (Chandra Rashi) is $moonSign '
           '(nakshatra $nakshatra). Use the current planetary transits counted from the Moon sign below. '
           'Cover career, wealth, love and health for this $timeFrame period.\n\n'
@@ -49,9 +51,13 @@ class _RashifalScreenState extends ConsumerState<RashifalScreen> {
           '${transits.map((t) => '- ${t.planetData.name} in ${t.rashiData.name}${t.retrograde ? ' (retrograde)' : ''}, house ${t.houseFromMoon} from Moon').join('\n')}\n\n'
           'Natal chart:\n${ChartSummary.describe(chartData, name: profile.name)}';
 
-      final response = await AiService.interpret(ref.read(settingsProvider), prompt, onPartial: (partial) {
-        if (mounted) setState(() => _resultText = partial);
-      });
+      final response = await AiService.interpret(
+        ref.read(settingsProvider),
+        prompt,
+        onPartial: (partial) {
+          if (mounted) setState(() => _resultText = partial);
+        },
+      );
       if (mounted) setState(() => _resultText = response);
     } catch (e) {
       if (mounted) setState(() => _error = '$e');
@@ -92,77 +98,85 @@ class _RashifalScreenState extends ConsumerState<RashifalScreen> {
                   onChanged: _isLoading
                       ? null
                       : (val) => setState(() {
-                            _selectedId = val;
-                            _resultText = null;
-                            _error = null;
-                            _activeTab = null;
-                          }),
+                          _selectedId = val;
+                          _resultText = null;
+                          _error = null;
+                          _activeTab = null;
+                        }),
                 ),
               ),
               const SizedBox(height: 12),
               Text(
-                  L10n.hi
-                      ? 'चन्द्र राशि: ${VedicMath.rashis[VedicMath.rashiIndex(moonSid)].hindi}'
-                      : 'Moon sign: ${VedicMath.rashis[VedicMath.rashiIndex(moonSid)].name} (${VedicMath.rashis[VedicMath.rashiIndex(moonSid)].hindi})',
-                  style: Theme.of(context).textTheme.titleMedium),
+                L10n.hi
+                    ? 'चन्द्र राशि: ${VedicMath.rashis[VedicMath.rashiIndex(moonSid)].hindi}'
+                    : 'Moon sign: ${VedicMath.rashis[VedicMath.rashiIndex(moonSid)].name} (${VedicMath.rashis[VedicMath.rashiIndex(moonSid)].hindi})',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
               const SizedBox(height: 16),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Row(
-                children: [
-                  for (final tab in ['Daily', 'Weekly', 'Monthly'])
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: ElevatedButton(
-                      onPressed: _isLoading ? null : () => _fetchRashifal(tab, profile),
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
-                        backgroundColor: _activeTab == tab ? scheme.primary : scheme.surfaceContainerHighest,
-                        foregroundColor: _activeTab == tab ? scheme.onPrimary : scheme.onSurface,
+                  children: [
+                    for (final tab in ['Daily', 'Weekly', 'Monthly'])
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: ElevatedButton(
+                            onPressed: _isLoading
+                                ? null
+                                : () => tab == 'Daily' ? Navigator.push(context, MaterialPageRoute(builder: (_) => DailyRashifalScreen(profileId: profile.id))) : _fetchRashifal(tab, profile),
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+                              backgroundColor: _activeTab == tab ? scheme.primary : scheme.surfaceContainerHighest,
+                              foregroundColor: _activeTab == tab ? scheme.onPrimary : scheme.onSurface,
+                            ),
+                            child: FittedBox(fit: BoxFit.scaleDown, child: Text(tr(tab, const {'Daily': 'दैनिक', 'Weekly': 'साप्ताहिक', 'Monthly': 'मासिक'}[tab]!))),
+                          ),
+                        ),
                       ),
-                      child: FittedBox(fit: BoxFit.scaleDown, child: Text(tr(tab, const {'Daily': 'दैनिक', 'Weekly': 'साप्ताहिक', 'Monthly': 'मासिक'}[tab]!))),
-                    ),
-                      ),
-                    ),
-                ],
-              ),
+                  ],
+                ),
               ),
               const SizedBox(height: 16),
               Expanded(
                 child: _isLoading && _resultText == null
                     ? Center(child: CircularProgressIndicator(color: scheme.primary))
                     : _error != null && _resultText == null
-                        ? SingleChildScrollView(
-                            padding: const EdgeInsets.all(24),
-                            child: Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: scheme.error)))
-                        : _resultText != null
-                            ? SingleChildScrollView(
-                                padding: const EdgeInsets.all(16),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                                  children: [
-                                    if (_isLoading) LinearProgressIndicator(color: scheme.primary, minHeight: 2),
-                                    Container(
-                                      padding: const EdgeInsets.all(16),
-                                      decoration: BoxDecoration(
-                                        color: scheme.surfaceContainerHighest,
-                                        borderRadius: BorderRadius.circular(16),
-                                        border: Border.all(color: scheme.outline),
-                                      ),
-                                      child: AiMarkdown(_resultText!),
-                                    ),
-                                    if (_error != null)
-                                      Padding(
-                                        padding: const EdgeInsets.only(top: 12),
-                                        child: Text(_error!, style: TextStyle(color: scheme.error)),
-                                      ),
-                                  ],
-                                ),
-                              )
-                            : Center(
-                                child: Text(tr('Select a timeframe to view the horoscope.', 'राशिफल देखने के लिए अवधि चुनें।'),
-                                    style: TextStyle(color: scheme.onSurfaceVariant))),
+                    ? SingleChildScrollView(
+                        padding: const EdgeInsets.all(24),
+                        child: Text(
+                          _error!,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: scheme.error),
+                        ),
+                      )
+                    : _resultText != null
+                    ? SingleChildScrollView(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            if (_isLoading) LinearProgressIndicator(color: scheme.primary, minHeight: 2),
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: scheme.surfaceContainerHighest,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: scheme.outline),
+                              ),
+                              child: AiMarkdown(_resultText!),
+                            ),
+                            if (_error != null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 12),
+                                child: Text(_error!, style: TextStyle(color: scheme.error)),
+                              ),
+                          ],
+                        ),
+                      )
+                    : Center(
+                        child: Text(tr('Select a timeframe to view the horoscope.', 'राशिफल देखने के लिए अवधि चुनें।'), style: TextStyle(color: scheme.onSurfaceVariant)),
+                      ),
               ),
             ],
           );

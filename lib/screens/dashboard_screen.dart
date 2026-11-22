@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/profile_provider.dart';
 import '../providers/sync_provider.dart';
+import '../providers/rashifal_provider.dart';
+import 'daily_rashifal_screen.dart';
 import 'kundali_screen.dart';
 import 'chat_screen.dart';
 import 'settings_screen.dart';
@@ -94,6 +96,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       child: CustomScrollView(
         slivers: [
           SliverToBoxAdapter(child: _buildHeroSection()),
+          const SliverToBoxAdapter(child: _TodayRashifalCard()),
           SliverToBoxAdapter(child: _buildQuickChips()),
           SliverPadding(
             padding: const EdgeInsets.all(24),
@@ -288,6 +291,50 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Today's rating and two-line Rashifal; opens the full day.
+class _TodayRashifalCard extends ConsumerWidget {
+  const _TodayRashifalCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final report = ref.watch(todayRashifalProvider).value;
+    if (report == null) return const SizedBox.shrink();
+    final scheme = Theme.of(context).colorScheme;
+    final color = ratingColor(context, report.rating);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: Material(
+        color: scheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => DailyRashifalScreen(profileId: report.profileId))),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), border: Border.all(color: color.withValues(alpha: 0.6))),
+            child: Row(children: [
+              CircleAvatar(
+                radius: 24,
+                backgroundColor: color.withValues(alpha: 0.18),
+                child: Text('${report.score}', style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 16)),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('${tr('Today', 'आज')} · ${report.profileName}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
+                  Text(report.notificationLine1, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600)),
+                  Text(report.notificationLine2, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
+                ]),
+              ),
+              Icon(Icons.chevron_right, color: scheme.secondary),
+            ]),
+          ),
         ),
       ),
     );

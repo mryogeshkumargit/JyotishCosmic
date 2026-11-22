@@ -7,7 +7,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:mobile_jyotish/core/database.dart';
 import 'package:mobile_jyotish/core/profile_chart.dart';
 import 'package:mobile_jyotish/providers/database_provider.dart';
+import 'package:mobile_jyotish/screens/daily_rashifal_screen.dart';
 import 'package:mobile_jyotish/screens/dashboard_screen.dart';
+import 'package:mobile_jyotish/screens/rashifal_history_screen.dart';
+import 'package:mobile_jyotish/screens/rashifal_settings_screen.dart';
 import 'package:mobile_jyotish/screens/kundali_milan_screen.dart';
 import 'package:mobile_jyotish/screens/kundali_screen.dart';
 import 'package:mobile_jyotish/screens/kundli_result_screen.dart';
@@ -170,6 +173,52 @@ void main() {
         await tester.runAsync(db.close);
         expect(failures, isEmpty, reason: failures.join('\n'));
       });
+
+      testWidgets('daily Rashifal screens fit $tag', (tester) async {
+        useLanguage();
+        await tester.binding.setSurfaceSize(size);
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final db = await seeded(tester);
+        final failures = <String>[];
+        failures.addAll((await collect(tester, () async {
+          await tester.pumpWidget(app(DailyRashifalScreen(date: DateTime(2026, 11, 23)), db, scale));
+          await settle(tester);
+          expect(find.text(tr('Daily Rashifal', 'दैनिक राशिफल')), findsWidgets);
+          // Open every collapsible block while scrolling to the end.
+          for (int i = 0; i < 30; i++) {
+            final tiles = find.byType(ExpansionTile);
+            for (final e in tiles.evaluate().toList()) {
+              final w = find.byWidget(e.widget);
+              if (w.hitTestable().evaluate().isNotEmpty) {
+                await tester.tap(w.hitTestable().first, warnIfMissed: false);
+              }
+            }
+            await settle(tester);
+            await tester.drag(find.byType(Scrollable).first, const Offset(0, -500));
+            await settle(tester);
+          }
+          await tester.drag(find.byType(Scrollable).first, const Offset(0, 40000));
+          await settle(tester);
+          await tester.tap(find.byTooltip(tr('Next day', 'अगला दिन')));
+          await settle(tester);
+        }))
+            .map((m) => 'daily: $m'));
+        for (final e in {'history': const RashifalHistoryScreen(), 'notification settings': const RashifalSettingsScreen()}.entries) {
+          failures.addAll((await collect(tester, () async {
+            await tester.pumpWidget(app(e.value, db, scale));
+            await settle(tester);
+            await tester.drag(find.byType(Scrollable).first, const Offset(0, -2000));
+            await settle(tester);
+          }))
+              .map((m) => '${e.key}: $m'));
+        }
+        await tester.pumpWidget(const SizedBox());
+        await settle(tester);
+        final saved = await tester.runAsync(() => db.select(db.dailyRashifals).get());
+        expect(saved, isNotEmpty, reason: 'opened days are saved');
+        await tester.runAsync(db.close);
+        expect(failures, isEmpty, reason: failures.join('\n'));
+      }, skip: swephSkipReason() != null);
 
       testWidgets('synthesis domain details fit $tag', (tester) async {
         useLanguage();

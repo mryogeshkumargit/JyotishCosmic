@@ -18,6 +18,8 @@ class PdfService {
   static final RegExp _devanagari = RegExp(r'[ऀ-ॿ]');
 
   /// Embedded Unicode fonts (Inter + Noto Sans Devanagari).
+  static Future<pw.ThemeData> loadTheme() => _loadTheme();
+
   static Future<pw.ThemeData> _loadTheme() async {
     if (_theme != null) return _theme!;
     Future<pw.Font> font(String path) async => pw.Font.ttf(await rootBundle.load(path));

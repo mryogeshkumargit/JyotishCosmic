@@ -68,6 +68,7 @@ class ProfileNotifier extends Notifier<void> {
         await db.into(db.pendingDeletions).insertOnConflictUpdate(
             PendingDeletionsCompanion.insert(cloudId: profile.cloudflareId!));
       }
+      await (db.delete(db.dailyRashifals)..where((t) => t.profileId.equals(profile.id))).go();
       await db.delete(db.profiles).delete(profile);
     });
     _sync();

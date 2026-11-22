@@ -50,14 +50,51 @@ class PendingDeletions extends Table {
   Set<Column> get primaryKey => {cloudId};
 }
 
-@DriftDatabase(tables: [Profiles, PendingDeletions])
+/// Daily Rashifal reports: one row per profile, date and language.
+///
+/// The complete report (every section, table and time window, plus the AI
+/// texts when used) is stored as JSON in [reportJson], so a saved day can be
+/// reopened exactly as generated. The other columns are small summaries used
+/// to list and page through the history without decoding the JSON.
+@DataClassName('DailyRashifalRow')
+@TableIndex(name: 'idx_daily_rashifals_date', columns: {#dateKey})
+class DailyRashifals extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  IntColumn get profileId => integer()();
+  TextColumn get profileName => text()();
+
+  /// Local calendar date, `yyyy-MM-dd` (sorts chronologically as text).
+  TextColumn get dateKey => text()();
+  TextColumn get lang => text().withDefault(const Constant('en'))();
+  IntColumn get score => integer()();
+
+  /// 'good', 'average' or 'bad'.
+  TextColumn get rating => text()();
+  TextColumn get headline => text()();
+  TextColumn get reportJson => text()();
+  BoolColumn get hasAi => boolean().withDefault(const Constant(false))();
+  TextColumn get aiModel => text().nullable()();
+
+  /// Raw AI answer, kept for auditing and re-parsing.
+  TextColumn get aiRaw => text().nullable()();
+  BoolColumn get favourite => boolean().withDefault(const Constant(false))();
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  List<Set<Column>> get uniqueKeys => [
+        {profileId, dateKey, lang},
+      ];
+}
+
+@DriftDatabase(tables: [Profiles, PendingDeletions, DailyRashifals])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration {
@@ -98,6 +135,10 @@ class AppDatabase extends _$AppDatabase {
           if (!existing.contains('cloudflare_id')) await m.addColumn(profiles, profiles.cloudflareId);
           if (!existing.contains('needs_sync')) await m.addColumn(profiles, profiles.needsSync);
           await m.createTable(pendingDeletions);
+        }
+        if (from < 6) {
+          await m.createTable(dailyRashifals);
+          await m.createIndex(idxDailyRashifalsDate);
         }
       },
     );

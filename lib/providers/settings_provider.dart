@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../core/calc_config.dart';
@@ -38,6 +40,106 @@ class LlmProviders {
   };
 }
 
+/// Daily Rashifal notification preferences.
+class RashifalPrefs {
+  /// Morning notification on/off.
+  final bool enabled;
+  final int hour;
+  final int minute;
+
+  /// Days that get a notification, as [DateTime.weekday] (1 = Monday).
+  final Set<int> weekdays;
+
+  /// Kundali used for the notification; null = first profile.
+  final int? profileId;
+
+  /// Place for the Panchang, sunrise and muhurats; null = the birth place.
+  final String? placeName;
+  final double? lat;
+  final double? lon;
+  final String? tzName;
+
+  /// Run the AI analysis automatically when a day is opened (needs an API key).
+  final bool autoAi;
+
+  const RashifalPrefs({
+    this.enabled = true,
+    this.hour = 8,
+    this.minute = 0,
+    this.weekdays = const {1, 2, 3, 4, 5, 6, 7},
+    this.profileId,
+    this.placeName,
+    this.lat,
+    this.lon,
+    this.tzName,
+    this.autoAi = true,
+  });
+
+  bool get hasPlace => placeName != null && lat != null && lon != null;
+
+  RashifalPrefs copyWith({
+    bool? enabled,
+    int? hour,
+    int? minute,
+    Set<int>? weekdays,
+    int? profileId,
+    bool clearProfile = false,
+    String? placeName,
+    double? lat,
+    double? lon,
+    String? tzName,
+    bool clearPlace = false,
+    bool? autoAi,
+  }) =>
+      RashifalPrefs(
+        enabled: enabled ?? this.enabled,
+        hour: hour ?? this.hour,
+        minute: minute ?? this.minute,
+        weekdays: weekdays ?? this.weekdays,
+        profileId: clearProfile ? null : (profileId ?? this.profileId),
+        placeName: clearPlace ? null : (placeName ?? this.placeName),
+        lat: clearPlace ? null : (lat ?? this.lat),
+        lon: clearPlace ? null : (lon ?? this.lon),
+        tzName: clearPlace ? null : (tzName ?? this.tzName),
+        autoAi: autoAi ?? this.autoAi,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'enabled': enabled,
+        'hour': hour,
+        'minute': minute,
+        'weekdays': (weekdays.toList()..sort()),
+        'profileId': profileId,
+        'placeName': placeName,
+        'lat': lat,
+        'lon': lon,
+        'tzName': tzName,
+        'autoAi': autoAi,
+      };
+
+  factory RashifalPrefs.fromJson(Map<String, dynamic> j) {
+    final days = (j['weekdays'] as List?)?.whereType<num>().map((e) => e.toInt()).where((d) => d >= 1 && d <= 7).toSet();
+    return RashifalPrefs(
+      enabled: j['enabled'] as bool? ?? true,
+      hour: ((j['hour'] as num?)?.toInt() ?? 8).clamp(0, 23),
+      minute: ((j['minute'] as num?)?.toInt() ?? 0).clamp(0, 59),
+      weekdays: days ?? const {1, 2, 3, 4, 5, 6, 7},
+      profileId: (j['profileId'] as num?)?.toInt(),
+      placeName: j['placeName'] as String?,
+      lat: (j['lat'] as num?)?.toDouble(),
+      lon: (j['lon'] as num?)?.toDouble(),
+      tzName: j['tzName'] as String?,
+      autoAi: j['autoAi'] as bool? ?? true,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) => other is RashifalPrefs && jsonEncode(toJson()) == jsonEncode(other.toJson());
+
+  @override
+  int get hashCode => jsonEncode(toJson()).hashCode;
+}
+
 class SettingsState {
   // Appearance
   final String chartStyle; // 'North', 'South' or 'East'
@@ -59,6 +161,9 @@ class SettingsState {
   /// Calculation conventions where traditions differ.
   final CalcConfig calc;
 
+  /// Daily Rashifal notification preferences.
+  final RashifalPrefs rashifal;
+
   SettingsState({
     this.chartStyle = 'North',
     this.themeMode = 'Cosmic',
@@ -70,6 +175,7 @@ class SettingsState {
     this.modelName = 'gpt-6.1-sol',
     this.modelCache = const {},
     this.calc = CalcConfig.defaults,
+    this.rashifal = const RashifalPrefs(),
   });
 
   /// Models to offer for [provider]: the live list if loaded, else suggestions.
@@ -90,6 +196,7 @@ class SettingsState {
     String? modelName,
     Map<String, List<String>>? modelCache,
     CalcConfig? calc,
+    RashifalPrefs? rashifal,
   }) {
     return SettingsState(
       chartStyle: chartStyle ?? this.chartStyle,
@@ -102,6 +209,7 @@ class SettingsState {
       modelName: modelName ?? this.modelName,
       modelCache: modelCache ?? this.modelCache,
       calc: calc ?? this.calc,
+      rashifal: rashifal ?? this.rashifal,
     );
   }
 }
@@ -150,7 +258,13 @@ class SettingsNotifier extends Notifier<SettingsState> {
         warRule: WarRule.values.where((v) => v.name == wr).firstOrNull,
         closeConjunctionOrb: orb,
       );
+      RashifalPrefs? rashifal;
+      try {
+        final raw = values['rashifalPrefs'];
+        if (raw != null) rashifal = RashifalPrefs.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+      } catch (_) {}
       state = state.copyWith(
+        rashifal: rashifal,
         calc: calc,
         modelCache: cache,
         chartStyle: values['chartStyle'],
@@ -210,6 +324,13 @@ class SettingsNotifier extends Notifier<SettingsState> {
       await _storage.write(key: 'calc_dashaYear', value: calc.dashaYearDays.toString());
       await _storage.write(key: 'calc_karakas', value: calc.karakaScheme.toString());
       await _storage.write(key: 'calc_transitOrb', value: calc.transitOrb.toString());
+    } catch (_) {}
+  }
+
+  Future<void> updateRashifal(RashifalPrefs prefs) async {
+    state = state.copyWith(rashifal: prefs);
+    try {
+      await _storage.write(key: 'rashifalPrefs', value: jsonEncode(prefs.toJson()));
     } catch (_) {}
   }
 

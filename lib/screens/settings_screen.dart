@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'rashifal_settings_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../core/calc_config.dart';
@@ -234,6 +235,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> with SingleTick
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
+        _sectionTitle(tr('Daily Rashifal', 'दैनिक राशिफल')),
+        const SizedBox(height: 8),
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.notifications_active_outlined),
+            title: Text(tr('Morning notification', 'सुबह की सूचना')),
+            subtitle: Consumer(builder: (context, ref, _) {
+              final p = ref.watch(settingsProvider.select((s) => s.rashifal));
+              return Text(p.enabled
+                  ? tr('On at ${p.hour.toString().padLeft(2, '0')}:${p.minute.toString().padLeft(2, '0')}, ${p.weekdays.length == 7 ? 'every day' : '${p.weekdays.length} days a week'}',
+                      'चालू, ${p.hour.toString().padLeft(2, '0')}:${p.minute.toString().padLeft(2, '0')} बजे, ${p.weekdays.length == 7 ? 'हर दिन' : 'सप्ताह में ${p.weekdays.length} दिन'}')
+                  : tr('Off', 'बंद'));
+            }),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RashifalSettingsScreen())),
+          ),
+        ),
+        const SizedBox(height: 24),
         _sectionTitle('Language / भाषा'),
         const SizedBox(height: 16),
         Consumer(builder: (context, ref, _) {

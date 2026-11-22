@@ -8,6 +8,13 @@ Jyotish Cosmic is a Vedic Astrology application for Android built with Flutter. 
 - **Hindi and English:** Settings → Style → Language switches the whole app between English and Hindi (हिन्दी): screens, chart labels, engine explanations, doshas, yogas, conjunctions, strength, synthesis, error messages and PDF exports. Hindi text uses the bundled Noto Sans Devanagari font. AI answers follow the language too (Settings → AI → response language). The research documents in the Knowledge Base and technical rule conditions stay in English.
 - **Birth charts:** North, South and East Indian chart styles. Each planet shows its degree and state markers, on the Lagna, Transit, Varshaphal and divisional charts: `*` retrograde, `^` combust (within the classical orb of the Sun), `↑` exalted, `↓` debilitated and `□` vargottama (same sign in D1 and D9). A legend is shown under the chart. The 16 Shodashvarga divisional charts are included.
 - **In simple words:** Synthesis, Doshas, Yogas, Conjunctions, Strength (Shadbala and Bhāva Bala), Ashtakavarga, Daśā, Transits, Panchang, KP, Avasthas, Remedies and Kundali Milan each open with a plain-language card. It explains what the result means for an ordinary reader: the life area, whether it helps or needs care, when it is active, and what softens it. The texts follow the classical significations (BPHS, Phaladeepika, Saravali, Brihat Jataka) and say where a dosha is a later tradition rather than a classical rule.
+- **Daily Rashifal with a morning notification:** Every morning (08:00 by default; time, days of the week, Kundali and place are set in Settings → Style → Daily Rashifal) a two-line notification gives the day's rating and a practical tip. Tapping it opens the full day for the chosen Kundali:
+  - **How the day will be** (Good / Average / Challenging, 0–100) with the reasons, then Family, Married life & relationships, Health, Work life, Mental peace, Finance and Social relations, each with its own score and factors.
+  - **Shubh muhurat** (Brahma and Abhijit muhurta, good Choghadiyas; Rahu Kaal, Yamaganda, Gulika and Bhadra to avoid), **travel** (Disha Shool, Chandra Vaas, travel nakshatras), **financial decisions** and **unexpected events**.
+  - **Today's mantra**, **upay**, **donation**, **colour of the day** and **do's and don'ts**.
+  - **Planetary analysis:** date and vara significance, Panchang with end times, Moon sign and transit from the Janma Rashi and Lagna, Gochar of the nine grahas with Ashtakavarga bindus, transit aspects and conjunctions on natal points, birth and transiting nakshatra (Tara Bala), Maha/Antar/Pratyantar Dasha with D9/D10 of the lords, daily planetary strength and the overall energy, plus natal yogas, doshas, Sade Sati, vargottama planets and conjunctions.
+
+  Everything is calculated on the device; the score is a transparent weighting of classical factors (Chandra Bala, Tara Bala, Gochar, Ashtakavarga, Dasha, Panchang) and each factor is listed with its sign. With an AI provider configured, **AI analysis** (automatic for today, optional) rewrites every section from the same calculated data as structured JSON, while the scores, tables and time windows stay the engine's. Each opened day is saved in the database with its full report (and the raw AI answer); **Saved Rashifals** pages through the history, with stars and clean-up options. Any day can be exported as a designed **PDF report** in English or Hindi. The notifications for the next 14 days are prepared on the device and handed to the OS scheduler, so they arrive without network access or the app running, and are refreshed whenever the app opens.
 - **Vimshottari Dasha:** Mahadasha, Antardasha and Pratyantardasha with the exact balance at birth.
 - **Panchang:** Tithi, Nakshatra, Yoga, Karana and Vara (sunrise to sunrise), with sunrise/sunset, Rahu Kaal, Yamaganda and Gulika — for today or at birth.
 - **Ashtakoot Guna Milan:** The 36-point system (Varna, Vashya, Tara, Yoni, Graha Maitri, Gana, Bhakoot, Nadi) using the standard tables, plus Manglik comparison.
@@ -50,6 +57,8 @@ Jyotish Cosmic works without an account. Profiles live in a local SQLite databas
 - an AI interpretation that you explicitly request, sent to the provider you configured with your key;
 - the manual "Check for Updates" button, which queries GitHub releases.
 
+The Daily Rashifal notifications are scheduled locally on the phone; no server is involved.
+
 Fonts, ephemeris files and the city database are bundled with the app.
 
 ## Architecture 🛠️
@@ -58,6 +67,7 @@ Fonts, ephemeris files and the city database are bundled with the app.
 - **Local storage:** SQLite via Drift
 - **Astronomy engine:** Swiss Ephemeris (`sweph` FFI plugin)
 - **Time zones:** `timezone` (IANA database, bundled)
+- **Notifications:** `flutter_local_notifications` (scheduled locally, restored after a reboot)
 
 ## Building from Source 💻
 

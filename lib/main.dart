@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -8,10 +10,16 @@ import 'package:sweph/sweph.dart';
 import 'core/ephemeris.dart';
 import 'core/l10n.dart';
 import 'core/vedic_math.dart';
+import 'providers/rashifal_provider.dart';
+import 'screens/daily_rashifal_screen.dart';
 import 'services/location_service.dart';
+import 'services/rashifal_notifications.dart';
 import 'theme/app_theme.dart';
 import 'screens/dashboard_screen.dart';
 import 'providers/settings_provider.dart';
+
+/// Root navigator, used to open screens from notification taps.
+final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
 class _RootBundleAssetLoader implements AssetLoader {
   @override
@@ -27,6 +35,7 @@ Future<void> main() async {
   GoogleFonts.config.allowRuntimeFetching = false;
 
   Object? startupError;
+  RashifalPayload? launchPayload;
   try {
     final supportDir = await getApplicationSupportDirectory();
     await Ephemeris.init(
@@ -37,16 +46,20 @@ Future<void> main() async {
   } catch (e) {
     startupError = e;
   }
+  if (startupError == null) launchPayload = await RashifalNotifications.init();
 
   runApp(
     ProviderScope(
-      child: startupError == null ? const MobileJyotishApp() : _StartupErrorApp(startupError),
+      child: startupError == null ? MobileJyotishApp(launchPayload: launchPayload) : _StartupErrorApp(startupError),
     ),
   );
 }
 
 class MobileJyotishApp extends ConsumerStatefulWidget {
-  const MobileJyotishApp({super.key});
+  /// Daily Rashifal notification that launched the app, if any.
+  final RashifalPayload? launchPayload;
+
+  const MobileJyotishApp({super.key, this.launchPayload});
 
   @override
   ConsumerState<MobileJyotishApp> createState() => _MobileJyotishAppState();
@@ -54,6 +67,30 @@ class MobileJyotishApp extends ConsumerStatefulWidget {
 
 class _MobileJyotishAppState extends ConsumerState<MobileJyotishApp> {
   String _lang = L10n.lang;
+  StreamSubscription<RashifalPayload>? _taps;
+
+  @override
+  void initState() {
+    super.initState();
+    _taps = RashifalNotifications.taps.listen(_openRashifal);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (widget.launchPayload != null) _openRashifal(widget.launchPayload!);
+      // Keep the morning notifications scheduled (refreshes the next days).
+      ref.read(rashifalSchedulerProvider).scheduleSoon(delay: const Duration(seconds: 3));
+    });
+  }
+
+  @override
+  void dispose() {
+    _taps?.cancel();
+    super.dispose();
+  }
+
+  void _openRashifal(RashifalPayload p) {
+    rootNavigatorKey.currentState?.push(MaterialPageRoute(
+      builder: (_) => DailyRashifalScreen(profileId: p.profileId, date: DateTime.tryParse(p.dateKey)),
+    ));
+  }
 
   /// Rebuilds every widget (including routes below the current one) so text
   /// produced with [tr] switches language immediately.
@@ -90,6 +127,7 @@ class _MobileJyotishAppState extends ConsumerState<MobileJyotishApp> {
     }
 
     return MaterialApp(
+      navigatorKey: rootNavigatorKey,
       title: 'Jyotish Cosmic',
       theme: activeTheme,
       locale: Locale(settings.appLanguage),
